@@ -1,0 +1,8 @@
+.env
+.venv/
+.railway/
+__pycache__/
+*.log
+*.py[cod]
+data/
+video_analysis/
