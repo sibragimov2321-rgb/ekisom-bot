@@ -2812,10 +2812,14 @@ async def main() -> None:
     dispatcher.include_router(router)
 
     me = await bot.get_me()
-    bot_username = me.username or ""
-    await configure_bot_profile(bot)
-    logging.info("Бот @%s запущен", bot_username)
-    web_runner = await start_smart_link_server()
+bot_username = me.username or ""
+
+# Временно отключено из-за Telegram Flood Control
+# await configure_bot_profile(bot)
+
+logging.info("Бот @%s запущен", bot_username)
+web_runner = await start_smart_link_server()
+  
     try:
         await dispatcher.start_polling(bot)
     finally:
