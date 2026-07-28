@@ -41,6 +41,11 @@ from admin_panel import (
     configure_admin_panel,
     show_admin_home,
 )
+from bookmaker_api import (
+    BookmakerApiError,
+    add_bookmaker_deposit,
+    find_bookmaker_user,
+)
 
 
 router = Router()
@@ -1219,6 +1224,98 @@ async def ask_for_account_id(
         await message.answer(text, reply_markup=ReplyKeyboardRemove())
 
 
+def bookmaker_config_for_platform(platform: str):
+    return settings.bookmaker_apis.get(platform.upper())
+
+
+async def verify_bookmaker_account(
+    message: Message,
+    state: FSMContext,
+    user_id: int,
+    platform: str,
+    account_id: str,
+) -> bool:
+    cfg = bookmaker_config_for_platform(platform)
+    if cfg is None or not cfg.is_configured:
+        await state.update_data(bookmaker_account_name=None, bookmaker_currency_id=None)
+        return True
+
+    language = get_language(user_id)
+    try:
+        account = await find_bookmaker_user(cfg, account_id)
+    except BookmakerApiError as exc:
+        logging.warning(
+            "Bookmaker account check failed for %s/%s: %s",
+            platform,
+            account_id,
+            exc,
+        )
+        await message.answer(
+            translate(
+                language,
+                f"ℹ️ Неверный ID для {html.escape(platform)}.",
+                f"ℹ️ Invalid ID for {html.escape(platform)}.",
+                f"ℹ️ {html.escape(platform)} үчүн ID туура эмес.",
+            )
+        )
+        return False
+
+    if cfg.allowed_currency_ids and account.currency_id not in cfg.allowed_currency_ids:
+        await message.answer(
+            translate(
+                language,
+                "ℹ️ Аккаунт найден, но валюта аккаунта не подходит для этого бота.",
+                "ℹ️ Account found, but its currency is not allowed for this bot.",
+                "ℹ️ Аккаунт табылды, бирок валютасы бул ботко туура келбейт.",
+            )
+        )
+        return False
+
+    await state.update_data(
+        bookmaker_account_name=account.name,
+        bookmaker_currency_id=account.currency_id,
+    )
+    if account.name:
+        await message.answer(
+            translate(
+                language,
+                f"✅ Аккаунт найден: <b>{html.escape(account.name)}</b>\n\nПродолжаем...",
+                f"✅ Account found: <b>{html.escape(account.name)}</b>\n\nContinuing...",
+                f"✅ Аккаунт табылды: <b>{html.escape(account.name)}</b>\n\nУлантабыз...",
+            )
+        )
+    return True
+
+
+async def credit_deposit_with_bookmaker_api(
+    operation: Operation,
+    language: str,
+) -> tuple[str, str | None]:
+    if operation.kind != "deposit" or not operation.platform or not operation.platform_account_id:
+        return "skipped", None
+    cfg = bookmaker_config_for_platform(operation.platform)
+    if cfg is None or not cfg.is_configured:
+        return "skipped", None
+    try:
+        result = await add_bookmaker_deposit(
+            cfg,
+            operation.platform_account_id,
+            operation.amount_minor,
+            language=language,
+        )
+    except BookmakerApiError as exc:
+        logging.warning(
+            "Bookmaker deposit failed for operation %s: %s",
+            operation.id,
+            exc,
+        )
+        return "failed", str(exc)
+    message_id = result.get("messageId") or result.get("message_id") or ""
+    if message_id:
+        return "credited", str(message_id)
+    return "credited", None
+
+
 async def account_selected(
     message: Message,
     state: FSMContext,
@@ -1933,6 +2030,15 @@ async def account_choice_callback(
         return
     await callback.answer()
     if callback.message is not None:
+        platform = str(data.get("platform") or "")
+        if not await verify_bookmaker_account(
+            callback.message,
+            state,
+            callback.from_user.id,
+            platform,
+            str(saved),
+        ):
+            return
         await account_selected(
             callback.message,
             state,
@@ -1964,6 +2070,16 @@ async def account_id_message(
                 "The ID must contain 4–30 digits or Latin characters.",
             )
         )
+        return
+    data = await state.get_data()
+    platform = str(data.get("platform") or "")
+    if not await verify_bookmaker_account(
+        message,
+        state,
+        message.from_user.id,
+        platform,
+        account_id,
+    ):
         return
     await account_selected(message, state, bot, message.from_user, account_id)
 
@@ -2635,6 +2751,29 @@ async def process_operation(callback: CallbackQuery, bot: Bot) -> None:
     )
 
     language = get_language(operation.user_id)
+    api_credit_status = "skipped"
+    api_credit_detail: str | None = None
+    if decision == "approved" and operation.kind == "deposit":
+        api_credit_status, api_credit_detail = await credit_deposit_with_bookmaker_api(
+            operation,
+            language,
+        )
+        if api_credit_status == "failed":
+            await audit_event(
+                bot,
+                callback.from_user,
+                f"API-зачисление по заявке #{operation.id} не выполнено",
+                title="⚠️ ОШИБКА API БК",
+                entity_type="operation",
+                entity_id=str(operation.id),
+                details=(
+                    f"Платформа: <b>{html.escape(operation.platform or '—')}</b>\n"
+                    f"Игровой ID: <code>{html.escape(operation.platform_account_id or '—')}</code>\n"
+                    f"Сумма: <b>{format_money(operation.amount_minor)}</b>\n"
+                    f"Ошибка: <code>{html.escape(api_credit_detail or 'unknown')}</code>\n\n"
+                    "Заявка подтверждена в боте, но зачисление в БК нужно проверить вручную."
+                ),
+            )
     if decision == "approved" and operation.kind == "deposit":
         player_notification = translate(
             language,

@@ -59,11 +59,10 @@ def _env_key(value: str) -> str:
 
 BANK_LABELS = {
     "MBANK": "MBANK",
+    "OPTIMA": "Optima",
     "OMONEY": "O!Деньги",
-    "MEGAPAY": "MegaPay",
-    "KOMPANION": "Компаньон",
-    "BALANCE": "Balance",
     "BAKAI_BANK": "BAKAI BANK",
+    "SIMBANK": "Simbank",
 }
 
 BANK_APP_LINKS = {
@@ -102,6 +101,29 @@ class PaymentMethod:
 
 
 @dataclass(frozen=True, slots=True)
+class BookmakerApiConfig:
+    platform: str
+    prefix: str
+    base_url: str
+    api_hash: str
+    cashier_password: str
+    cashdesk_id: str
+    login: str
+    allowed_currency_ids: frozenset[str]
+
+    @property
+    def is_configured(self) -> bool:
+        return all(
+            (
+                self.api_hash,
+                self.cashier_password,
+                self.cashdesk_id,
+                self.login,
+            )
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     bot_token: str
     admin_ids: frozenset[int]
@@ -109,6 +131,7 @@ class Settings:
     support_username: str
     currency: str
     platforms: tuple[str, ...]
+    bookmaker_apis: dict[str, BookmakerApiConfig]
     platform_icon_custom_emoji_ids: dict[str, str]
     payment_methods: tuple[PaymentMethod, ...]
     payment_qr_image: str | None
@@ -124,6 +147,46 @@ class Settings:
     min_referral_withdraw_minor: int
     deposit_instructions: str
     database_path: Path
+
+
+def _bookmaker_prefix(platform: str) -> str | None:
+    normalized = _env_key(platform)
+    aliases = {
+        "1XBET": "XBET",
+        "XBET": "XBET",
+        "MELBET": "MELBET",
+        "1WIN": "ONEWIN",
+        "ONEWIN": "ONEWIN",
+    }
+    return aliases.get(normalized)
+
+
+def _load_bookmaker_apis(platforms: tuple[str, ...]) -> dict[str, BookmakerApiConfig]:
+    result: dict[str, BookmakerApiConfig] = {}
+    default_base_url = "https://partners.servcul.com/CashdeskBotAPI"
+    for platform in platforms:
+        prefix = _bookmaker_prefix(platform)
+        if prefix is None:
+            continue
+        base_url = (
+            os.getenv(f"{prefix}_API_BASE_URL", "").strip().rstrip("/")
+            or default_base_url
+        )
+        if not re.match(r"^https://", base_url, flags=re.IGNORECASE):
+            raise RuntimeError(f"{prefix}_API_BASE_URL должен начинаться с https://")
+        result[platform.upper()] = BookmakerApiConfig(
+            platform=platform,
+            prefix=prefix,
+            base_url=base_url,
+            api_hash=os.getenv(f"{prefix}_API_HASH", "").strip(),
+            cashier_password=os.getenv(f"{prefix}_CASHIER_PASSWORD", "").strip(),
+            cashdesk_id=os.getenv(f"{prefix}_CASHDESK_ID", "").strip(),
+            login=os.getenv(f"{prefix}_LOGIN", "").strip(),
+            allowed_currency_ids=frozenset(
+                _csv(os.getenv(f"{prefix}_ALLOWED_CURRENCY_IDS", ""))
+            ),
+        )
+    return result
 
 
 def load_settings() -> Settings:
@@ -161,7 +224,7 @@ def load_settings() -> Settings:
     for configured_name in _csv(
         os.getenv(
             "PAYMENT_METHODS",
-            "MBANK,OMONEY,KOMPANION,BALANCE,MEGAPAY,BAKAI_BANK",
+            "MBANK,OPTIMA,BAKAI_BANK,OMONEY,SIMBANK",
         )
     ):
         key = _env_key(configured_name)
@@ -284,6 +347,7 @@ def load_settings() -> Settings:
         support_username=support,
         currency=currency,
         platforms=platforms,
+        bookmaker_apis=_load_bookmaker_apis(platforms),
         platform_icon_custom_emoji_ids=platform_icon_custom_emoji_ids,
         payment_methods=tuple(methods),
         payment_qr_image=payment_qr_image,

@@ -158,3 +158,21 @@ MIN_REFERRAL_WITHDRAW=500
 
 Для резервной копии остановите бота и скопируйте папку `data`. Файл `.env`
 содержит секретный токен и не должен публиковаться.
+## API БК
+
+Секретные ключи не добавляются в GitHub. Для проверки ID и автоматического
+зачисления после подтверждения чека добавьте переменные в Railway.
+
+Для 1XBET:
+
+```env
+XBET_API_BASE_URL=https://partners.servcul.com/CashdeskBotAPI
+XBET_API_HASH=
+XBET_CASHIER_PASSWORD=
+XBET_CASHDESK_ID=
+XBET_LOGIN=
+XBET_ALLOWED_CURRENCY_IDS=
+```
+
+Для MELBET используйте такие же поля с префиксом `MELBET_`, для 1WIN —
+с префиксом `ONEWIN_`. Подробно расписано в `API_SETUP_RU.md`.
