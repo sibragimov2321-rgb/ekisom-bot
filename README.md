@@ -57,7 +57,7 @@ PAYMENT_BAKAI_BANK_DETAILS=Ваши настоящие реквизиты BAKAI 
 изображением:
 
 ```text
-PAYMENT_QR_IMAGE=assets/payment_qr.png
+PAYMENT_QR_IMAGE=universal_bank_qr.png
 ```
 
 Для динамического QR можно указать HTTPS-шаблон. Доступные переменные:

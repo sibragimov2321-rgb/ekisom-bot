@@ -687,6 +687,7 @@ def bank_links_keyboard(
     for method in settings.payment_methods:
         if not database.is_payment_method_enabled(method.key):
             continue
+        smart_url = smart_bank_url(method)
         try:
             payment_url = (
                 render_payment_template(method.url, data, total_minor)
@@ -696,16 +697,19 @@ def bank_links_keyboard(
         except (KeyError, ValueError):
             logging.exception("Invalid payment URL template for %s", method.key)
             payment_url = None
-        button_kwargs: dict[str, str] = (
-            {"url": payment_url}
-            if payment_url
-            else {"callback_data": f"bank:select:{method.key}"}
+        button_url = (
+            smart_url
+            or method.android_url
+            or method.ios_url
+            or payment_url
         )
+        if not button_url:
+            continue
         current.append(
             InlineKeyboardButton(
                 text=uniform_button_text(method.name),
                 style="success",
-                **button_kwargs,
+                url=button_url,
             )
         )
         if len(current) == 2:

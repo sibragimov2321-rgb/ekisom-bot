@@ -70,6 +70,10 @@ BANK_APP_LINKS = {
         "android": "https://play.google.com/store/apps/details?id=com.maanavan.mb_kyrgyzstan",
         "ios": "https://apps.apple.com/kg/app/id922922121",
     },
+    "OPTIMA": {
+        "android": "https://play.google.com/store/apps/details?id=kg.optimabank.optima24",
+        "ios": "https://apps.apple.com/kg/app/optima24/id1021852052",
+    },
     "OMONEY": {
         "android": "https://play.google.com/store/apps/details?id=kg.o.nurtelecom",
         "ios": "https://apps.apple.com/kg/app/id1257075492",
@@ -85,6 +89,10 @@ BANK_APP_LINKS = {
     "BAKAI_BANK": {
         "android": "https://play.google.com/store/apps/details?id=kg.bta.mobilebank2",
         "ios": "https://apps.apple.com/kg/app/id1294108123",
+    },
+    "SIMBANK": {
+        "android": "https://play.google.com/store/apps/details?id=com.doscredo.simbank",
+        "ios": "https://apps.apple.com/kg/app/simbank/id6499126462",
     },
 }
 
@@ -272,7 +280,10 @@ def load_settings() -> Settings:
     if not methods:
         raise RuntimeError("PAYMENT_METHODS не должен быть пустым")
 
-    payment_qr_image = os.getenv("PAYMENT_QR_IMAGE", "").strip() or None
+    payment_qr_image = (
+        os.getenv("PAYMENT_QR_IMAGE", "").strip()
+        or "universal_bank_qr.png"
+    )
     if payment_qr_image and not re.match(
         r"^(https?://|[A-Za-z0-9_-]{20,}$)", payment_qr_image
     ):
