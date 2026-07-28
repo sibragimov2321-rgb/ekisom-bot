@@ -255,29 +255,39 @@ async def replace_panel_message(
 
 def home_markup(role: str) -> InlineKeyboardMarkup:
     if role == "owner":
+        maintenance_enabled = database.get_setting_bool("maintenance_mode")
         rows = [
+            [InlineKeyboardButton(text="📊 Статистика", callback_data="ap:stats")],
             [
-                InlineKeyboardButton(text="📊 Статистика", callback_data="ap:stats"),
+                InlineKeyboardButton(text="🔗 Настроить ссылки", callback_data="ap:links")
+            ],
+            [
+                InlineKeyboardButton(text="✈️ Рассылка", callback_data="ap:broadcast"),
+                InlineKeyboardButton(text="🔗 Пост в канал", callback_data="ap:post_channel"),
+            ],
+            [
+                InlineKeyboardButton(text="🎁 Счастливый час", callback_data="ap:happy_hour"),
+                InlineKeyboardButton(text="📊 История игрока", callback_data="ap:player_history"),
+            ],
+            [
+                InlineKeyboardButton(text="⚙️ Настройки", callback_data="ap:system")
+            ],
+            [
                 InlineKeyboardButton(
-                    text=(
-                        "🔧 Тех. работы: 🟢 ВКЛ"
-                        if database.get_setting_bool("maintenance_mode")
-                        else "🔧 Тех. работы: 🔴 ВЫКЛ"
-                    ),
+                    text=("🛡️ Включить бота" if maintenance_enabled else "🛡️ Выключить бота"),
                     callback_data="ap:maintenance",
-                ),
+                )
             ],
             [
-                InlineKeyboardButton(text="💳 Карты", callback_data="ap:cards"),
-                InlineKeyboardButton(text="🌐 Платформы", callback_data="ap:platforms"),
+                InlineKeyboardButton(text="🛡️ Назначить админа", callback_data="ap:teamadd:manager"),
+                InlineKeyboardButton(text="⚠️ Снять админа", callback_data="ap:team"),
             ],
             [
-                InlineKeyboardButton(text="🏦 Способы оплаты", callback_data="ap:payments"),
-                InlineKeyboardButton(text="📢 Рассылка", callback_data="ap:broadcast"),
+                InlineKeyboardButton(text="🔒 Забанить", callback_data="ap:ban"),
+                InlineKeyboardButton(text="🔓 Разбанить", callback_data="ap:unban"),
             ],
             [
-                InlineKeyboardButton(text="👥 Команда", callback_data="ap:team"),
-                InlineKeyboardButton(text="⚙️ Система", callback_data="ap:system"),
+                InlineKeyboardButton(text="❌ Закрыть", callback_data="ap:close")
             ],
         ]
     elif role == "supervisor":
@@ -307,17 +317,24 @@ async def show_admin_home(target: Message | CallbackQuery) -> None:
         else:
             await target.answer("Команда доступна только сотрудникам.")
         return
-    title = {
-        "owner": "👤 <b>PANEL: OWNER</b>",
-        "supervisor": "👔 <b>PANEL: УПРАВЛЯЮЩИЙ</b>",
-        "manager": "🛠️ <b>PANEL: МЕНЕДЖЕР</b>",
-    }[role]
-    text = (
-        f"{title}\n\n"
-        f"Сотрудник: {html.escape(user.full_name)}\n"
-        f"ID: <code>{user.id}</code>\n\n"
-        "Выберите модуль управления:"
-    )
+    if role == "owner":
+        is_off = database.get_setting_bool("maintenance_mode")
+        text = (
+            "Добро пожаловать в Админ-панель:\n\n"
+            f"Статус бота: {'🔒' if is_off else '📥'} "
+            f"<b>{'ВЫКЛЮЧЕН' if is_off else 'ВКЛЮЧЕН'}</b>"
+        )
+    else:
+        title = {
+            "supervisor": "👔 <b>PANEL: УПРАВЛЯЮЩИЙ</b>",
+            "manager": "🛠️ <b>PANEL: МЕНЕДЖЕР</b>",
+        }[role]
+        text = (
+            f"{title}\n\n"
+            f"Сотрудник: {html.escape(user.full_name)}\n"
+            f"ID: <code>{user.id}</code>\n\n"
+            "Выберите модуль управления:"
+        )
     markup = home_markup(role)
     if isinstance(target, CallbackQuery):
         await target.answer()
@@ -351,6 +368,41 @@ async def admin_cancel(message: Message, state: FSMContext) -> None:
 async def home_callback(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await show_admin_home(callback)
+
+
+@admin_router.callback_query(F.data == "ap:links")
+async def links_callback(callback: CallbackQuery) -> None:
+    await system_callback(callback)
+
+
+@admin_router.callback_query(F.data == "ap:post_channel")
+async def post_channel_callback(callback: CallbackQuery, state: FSMContext) -> None:
+    await broadcast_callback(callback, state)
+
+
+@admin_router.callback_query(F.data.in_({"ap:happy_hour", "ap:player_history", "ap:ban", "ap:unban"}))
+async def planned_admin_feature_callback(callback: CallbackQuery) -> None:
+    names = {
+        "ap:happy_hour": "Счастливый час",
+        "ap:player_history": "История игрока",
+        "ap:ban": "Забанить",
+        "ap:unban": "Разбанить",
+    }
+    await callback.answer(
+        f"Раздел «{names.get(callback.data or '', 'Панель')}» добавлен в меню.",
+        show_alert=True,
+    )
+
+
+@admin_router.callback_query(F.data == "ap:close")
+async def close_admin_panel_callback(callback: CallbackQuery) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest:
+        await callback.message.edit_text("Админ-панель закрыта.")
 
 
 @admin_router.callback_query(F.data == "ap:stats")
