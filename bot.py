@@ -718,7 +718,10 @@ def emv_amount_payload(payload: str, amount_minor: int) -> str | None:
     if not fields or fields[0][0] != "00":
         return None
 
-    amount = amount_for_url(amount_minor)
+    # The Kyrgyz interbank QR format expects the amount in tyiyns as an
+    # integer (e.g. 10055 for 100.55 KGS), not a decimal string "100.55".
+    # Its tag 54 length must be calculated from this integer value.
+    amount = str(amount_minor)
     amount_field = ("54", amount)
     insert_at = len(fields)
     for index, (tag, _value) in enumerate(fields):
