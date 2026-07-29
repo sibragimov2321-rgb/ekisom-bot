@@ -1232,6 +1232,10 @@ def bookmaker_config_for_platform(platform: str):
     return settings.bookmaker_apis.get(platform.upper())
 
 
+def platform_requires_api(platform: str) -> bool:
+    return platform.upper() in {"1XBET", "MELBET", "1WIN"}
+
+
 async def verify_bookmaker_account(
     message: Message,
     state: FSMContext,
@@ -1240,11 +1244,51 @@ async def verify_bookmaker_account(
     account_id: str,
 ) -> bool:
     cfg = bookmaker_config_for_platform(platform)
-    if cfg is None or not cfg.is_configured:
+    language = get_language(user_id)
+    if cfg is None:
+        if platform_requires_api(platform):
+            await message.answer(
+                translate(
+                    language,
+                    f"⚠️ Проверка ID для {html.escape(platform)} не настроена. Сообщите администратору.",
+                    f"⚠️ ID check for {html.escape(platform)} is not configured. Please contact support.",
+                    f"⚠️ {html.escape(platform)} үчүн ID текшерүү жөндөлгөн эмес. Администраторго кайрылыңыз.",
+                )
+            )
+            return False
         await state.update_data(bookmaker_account_name=None, bookmaker_currency_id=None)
         return True
 
-    language = get_language(user_id)
+    if not cfg.is_configured:
+        missing = ", ".join(cfg.missing_fields)
+        logging.warning(
+            "Bookmaker account check skipped for %s/%s: missing env %s",
+            platform,
+            account_id,
+            missing,
+        )
+        await message.answer(
+            translate(
+                language,
+                (
+                    f"⚠️ Проверка ID для {html.escape(platform)} пока не включена.\n"
+                    f"Не хватает настроек API: <code>{html.escape(missing)}</code>.\n"
+                    "Сообщите администратору."
+                ),
+                (
+                    f"⚠️ ID check for {html.escape(platform)} is not enabled yet.\n"
+                    f"Missing API settings: <code>{html.escape(missing)}</code>.\n"
+                    "Please contact support."
+                ),
+                (
+                    f"⚠️ {html.escape(platform)} үчүн ID текшерүү азырынча иштетилген эмес.\n"
+                    f"API жөндөөлөрү жетишпейт: <code>{html.escape(missing)}</code>.\n"
+                    "Администраторго кайрылыңыз."
+                ),
+            )
+        )
+        return False
+
     try:
         account = await find_bookmaker_user(cfg, account_id)
     except BookmakerApiError as exc:

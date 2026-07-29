@@ -130,6 +130,19 @@ class BookmakerApiConfig:
             )
         )
 
+    @property
+    def missing_fields(self) -> tuple[str, ...]:
+        missing: list[str] = []
+        if not self.api_hash:
+            missing.append(f"{self.prefix}_API_HASH")
+        if not self.cashier_password:
+            missing.append(f"{self.prefix}_CASHIER_PASSWORD")
+        if not self.cashdesk_id:
+            missing.append(f"{self.prefix}_CASHDESK_ID")
+        if not self.login:
+            missing.append(f"{self.prefix}_LOGIN")
+        return tuple(missing)
+
 
 @dataclass(frozen=True, slots=True)
 class Settings:
