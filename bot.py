@@ -53,6 +53,7 @@ settings: Settings
 database: Database
 bot_username = ""
 payment_expiry_tasks: dict[int, asyncio.Task[None]] = {}
+DEPOSIT_ID_INSTRUCTION_IMAGE = Path(__file__).resolve().parent / "assets" / "deposit_id_instruction.jpg"
 
 
 TERMS_RU = """
@@ -1288,6 +1289,20 @@ async def ask_for_account_id(
         "referral": ReferralFlow.account_id,
     }[flow]
     await state.set_state(state_value)
+    if DEPOSIT_ID_INSTRUCTION_IMAGE.is_file() and flow in {"deposit", "withdrawal"}:
+        try:
+            await message.answer_photo(
+                FSInputFile(DEPOSIT_ID_INSTRUCTION_IMAGE),
+                caption=translate(
+                    language,
+                    f"💰 Пополнение счета\n\nСчет: <b>{html.escape(platform)}</b>\n\nВведите ID счета:",
+                    f"💰 Account top-up\n\nAccount: <b>{html.escape(platform)}</b>\n\nEnter account ID:",
+                    f"💰 Эсепти толуктоо\n\nЭсеп: <b>{html.escape(platform)}</b>\n\nЭсеп ID киргизиңиз:",
+                ),
+                reply_markup=ReplyKeyboardRemove(),
+            )
+        except Exception:
+            logging.exception("Failed to send deposit ID instruction image")
     if saved:
         text = translate(
             language,
