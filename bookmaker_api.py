@@ -23,6 +23,26 @@ class BookmakerUser:
     raw: dict[str, Any]
 
 
+def _get_any(data: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in data:
+            return data[key]
+    lowered = {str(key).lower(): value for key, value in data.items()}
+    for key in keys:
+        value = lowered.get(key.lower())
+        if value is not None:
+            return value
+    return None
+
+
+def _payload_dict(data: dict[str, Any]) -> dict[str, Any]:
+    for key in ("data", "Data", "result", "Result", "user", "User"):
+        value = data.get(key)
+        if isinstance(value, dict):
+            return value
+    return data
+
+
 def _md5(value: str) -> str:
     return hashlib.md5(value.encode("utf-8")).hexdigest()
 
@@ -89,18 +109,19 @@ async def find_bookmaker_user(
 
     if not isinstance(data, dict):
         raise BookmakerApiError(f"{cfg.platform}: unexpected API response")
-    if data.get("success") is False:
-        raise BookmakerApiError(str(data.get("message") or "User not found"))
+    success = _get_any(data, "success", "Success")
+    if success is False:
+        raise BookmakerApiError(str(_get_any(data, "message", "Message", "error", "Error") or "User not found"))
 
-    payload = data.get("data") if isinstance(data.get("data"), dict) else data
+    payload = _payload_dict(data)
     if not isinstance(payload, dict):
         raise BookmakerApiError(f"{cfg.platform}: empty user response")
 
-    returned_user_id = str(payload.get("userId") or payload.get("id") or "").strip()
-    currency_id = str(payload.get("currencyId") or "")
-    name = str(payload.get("name") or payload.get("login") or "")
+    returned_user_id = str(_get_any(payload, "userId", "UserId", "userid", "id", "Id") or "").strip()
+    currency_id = str(_get_any(payload, "currencyId", "CurrencyId", "currency_id", "currency") or "")
+    name = str(_get_any(payload, "name", "Name", "login", "Login", "fullName", "FullName") or "")
     if not returned_user_id:
-        raise BookmakerApiError("User not found")
+        raise BookmakerApiError(f"User not found; response fields: {', '.join(map(str, payload.keys()))}")
     return BookmakerUser(
         user_id=returned_user_id,
         name=name,
