@@ -1292,20 +1292,25 @@ async def verify_bookmaker_account(
     try:
         account = await find_bookmaker_user(cfg, account_id)
     except BookmakerApiError as exc:
+        detail = str(exc)
         logging.warning(
             "Bookmaker account check failed for %s/%s: %s",
             platform,
             account_id,
             exc,
         )
-        await message.answer(
-            translate(
-                language,
-                f"ℹ️ Неверный ID для {html.escape(platform)}.",
-                f"ℹ️ Invalid ID for {html.escape(platform)}.",
-                f"ℹ️ {html.escape(platform)} үчүн ID туура эмес.",
-            )
+        text = translate(
+            language,
+            f"ℹ️ Неверный ID для {html.escape(platform)}.",
+            f"ℹ️ Invalid ID for {html.escape(platform)}.",
+            f"ℹ️ {html.escape(platform)} үчүн ID туура эмес.",
         )
+        if user_id in settings.admin_ids:
+            text += (
+                f"\n\n<code>API debug: {html.escape(detail[:700])}</code>"
+                f"\n<code>cashdesk: {html.escape(cfg.cashdesk_id)}</code>"
+            )
+        await message.answer(text)
         return False
 
     if cfg.allowed_currency_ids and account.currency_id not in cfg.allowed_currency_ids:
