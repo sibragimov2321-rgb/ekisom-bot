@@ -12,6 +12,9 @@ import aiohttp
 from config import BookmakerApiConfig
 
 
+BOOKMAKER_API_CLIENT_VERSION = "2026-07-29-user-lookup-variants"
+
+
 class BookmakerApiError(RuntimeError):
     pass
 
