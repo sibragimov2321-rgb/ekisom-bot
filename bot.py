@@ -8,7 +8,7 @@ import re
 from io import BytesIO
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import qrcode
 from aiogram import Bot, Dispatcher, F, Router
@@ -675,6 +675,96 @@ def render_payment_template(
         account_id=quote(str(data["account_id"]), safe=""),
         platform=quote(str(data["platform"]), safe=""),
     )
+
+
+def emv_crc16(payload: str) -> str:
+    crc = 0xFFFF
+    for char in payload.encode("ascii"):
+        crc ^= char << 8
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = ((crc << 1) ^ 0x1021) & 0xFFFF
+            else:
+                crc = (crc << 1) & 0xFFFF
+    return f"{crc:04X}"
+
+
+def emv_tag(tag: str, value: str) -> str:
+    return f"{tag}{len(value):02d}{value}"
+
+
+def emv_amount_payload(payload: str, amount_minor: int) -> str | None:
+    if not re.fullmatch(r"[0-9A-Za-zА-Яа-я._:/# -]+", payload):
+        return None
+    fields: list[tuple[str, str]] = []
+    pos = 0
+    while pos + 4 <= len(payload):
+        tag = payload[pos : pos + 2]
+        raw_length = payload[pos + 2 : pos + 4]
+        if not tag.isdigit() or not raw_length.isdigit():
+            return None
+        length = int(raw_length)
+        start = pos + 4
+        end = start + length
+        if end > len(payload):
+            return None
+        value = payload[start:end]
+        pos = end
+        if tag == "63":
+            break
+        if tag != "54":
+            fields.append((tag, value))
+    if not fields or fields[0][0] != "00":
+        return None
+
+    amount = amount_for_url(amount_minor)
+    amount_field = ("54", amount)
+    insert_at = len(fields)
+    for index, (tag, _value) in enumerate(fields):
+        if tag == "53":
+            insert_at = index + 1
+            break
+        if tag in {"58", "59", "60"}:
+            insert_at = index
+            break
+    fields.insert(insert_at, amount_field)
+
+    without_crc = "".join(emv_tag(tag, value) for tag, value in fields)
+    crc_input = without_crc + "6304"
+    return crc_input + emv_crc16(crc_input)
+
+
+def inject_amount_into_qr_payload(payload: str, amount_minor: int) -> str:
+    direct = emv_amount_payload(payload, amount_minor)
+    if direct:
+        return direct
+
+    try:
+        parts = urlsplit(payload)
+    except ValueError:
+        return payload
+    if parts.fragment:
+        updated_fragment = emv_amount_payload(parts.fragment, amount_minor)
+        if updated_fragment:
+            return urlunsplit(
+                (
+                    parts.scheme,
+                    parts.netloc,
+                    parts.path,
+                    parts.query,
+                    updated_fragment,
+                )
+            )
+    return payload
+
+
+def render_payment_qr_payload(
+    template: str,
+    data: dict,
+    total_minor: int,
+) -> str:
+    payload = render_payment_template(template, data, total_minor)
+    return inject_amount_into_qr_payload(payload, total_minor)
 
 
 def bank_links_keyboard(
@@ -1545,7 +1635,17 @@ async def accept_deposit_amount(
     markup = bank_links_keyboard(data, total_minor, language)
     photo: str | FSInputFile | BufferedInputFile | None = None
     has_managed_cards = bool(database.list_cards())
-    if not has_managed_cards and settings.payment_qr_image:
+    if not has_managed_cards and settings.payment_qr_url_template:
+        try:
+            payload = render_payment_qr_payload(
+                settings.payment_qr_url_template,
+                data,
+                total_minor,
+            )
+            photo = generate_qr_from_payload(payload)
+        except (KeyError, ValueError):
+            logging.exception("Invalid PAYMENT_QR_URL_TEMPLATE")
+    elif not has_managed_cards and settings.payment_qr_image:
         if Path(settings.payment_qr_image).is_file():
             photo = FSInputFile(settings.payment_qr_image)
         elif re.fullmatch(r"[A-Za-z0-9_-]{20,}", settings.payment_qr_image) or re.match(
@@ -1556,7 +1656,7 @@ async def accept_deposit_amount(
             logging.warning(
                 "PAYMENT_QR_IMAGE file is missing: %s", settings.payment_qr_image
             )
-    elif not has_managed_cards and settings.payment_qr_url_template:
+    elif False and not has_managed_cards and settings.payment_qr_url_template:
         try:
             payload = render_payment_template(
                 settings.payment_qr_url_template,
