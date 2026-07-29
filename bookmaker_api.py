@@ -96,9 +96,11 @@ async def find_bookmaker_user(
     if not isinstance(payload, dict):
         raise BookmakerApiError(f"{cfg.platform}: empty user response")
 
-    returned_user_id = str(payload.get("userId") or payload.get("id") or user_id)
+    returned_user_id = str(payload.get("userId") or payload.get("id") or "").strip()
     currency_id = str(payload.get("currencyId") or "")
     name = str(payload.get("name") or payload.get("login") or "")
+    if not returned_user_id:
+        raise BookmakerApiError("User not found")
     return BookmakerUser(
         user_id=returned_user_id,
         name=name,
