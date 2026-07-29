@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -75,6 +76,26 @@ def _user_sign(cfg: BookmakerApiConfig, user_id: str) -> str:
     return _sha256(part_a + part_b)
 
 
+def _user_sign_variant(cfg: BookmakerApiConfig, user_id: str, *, camel_case: bool) -> str:
+    if not camel_case:
+        return _user_sign(cfg, user_id)
+    part_a = _sha256(
+        f"hash={cfg.api_hash}&userId={user_id}&cashdeskId={cfg.cashdesk_id}"
+    )
+    part_b = _md5(
+        f"userId={user_id}&cashierpass={cfg.cashier_password}&hash={cfg.api_hash}"
+    )
+    return _sha256(part_a + part_b)
+
+
+def _short_json(data: Any, *, limit: int = 700) -> str:
+    try:
+        text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    except Exception:
+        text = str(data)
+    return text[:limit]
+
+
 def _deposit_sign(
     cfg: BookmakerApiConfig, user_id: str, amount: str, language: str
 ) -> str:
@@ -95,18 +116,50 @@ async def find_bookmaker_user(
         raise BookmakerApiError(f"{cfg.platform}: API is not configured")
 
     url = f"{cfg.base_url}/Users/{user_id}"
-    params = {"confirm": _confirm(user_id, cfg), "cashdeskId": cfg.cashdesk_id}
-    headers = {"sign": _user_sign(cfg, user_id)}
+    attempts = (
+        (
+            "docs",
+            {"confirm": _confirm(user_id, cfg), "cashdeskId": cfg.cashdesk_id},
+            {"sign": _user_sign_variant(cfg, user_id, camel_case=False)},
+        ),
+        (
+            "camel-sign",
+            {"confirm": _confirm(user_id, cfg), "cashdeskId": cfg.cashdesk_id},
+            {"sign": _user_sign_variant(cfg, user_id, camel_case=True)},
+        ),
+        (
+            "lower-cashdesk-param",
+            {"confirm": _confirm(user_id, cfg), "cashdeskid": cfg.cashdesk_id},
+            {"sign": _user_sign_variant(cfg, user_id, camel_case=False)},
+        ),
+    )
+    errors: list[str] = []
 
     try:
         async with aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=timeout_seconds)
         ) as session:
-            async with session.get(url, params=params, headers=headers) as response:
-                data = await _read_json(response)
+            for attempt_name, params, headers in attempts:
+                try:
+                    async with session.get(url, params=params, headers=headers) as response:
+                        data = await _read_json(response)
+                except BookmakerApiError as exc:
+                    errors.append(f"{attempt_name}: {exc}")
+                    continue
+
+                try:
+                    return _parse_bookmaker_user_response(cfg, data)
+                except BookmakerApiError as exc:
+                    errors.append(f"{attempt_name}: {exc}; response={_short_json(data)}")
     except aiohttp.ClientError as exc:
         raise BookmakerApiError(f"{cfg.platform}: connection error") from exc
 
+    raise BookmakerApiError(" | ".join(errors) or "User not found")
+
+
+def _parse_bookmaker_user_response(
+    cfg: BookmakerApiConfig, data: Any
+) -> BookmakerUser:
     if not isinstance(data, dict):
         raise BookmakerApiError(f"{cfg.platform}: unexpected API response")
     success = _get_any(data, "success", "Success")
