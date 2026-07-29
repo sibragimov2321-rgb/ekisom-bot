@@ -2935,6 +2935,8 @@ async def configure_bot_profile(bot: Bot) -> None:
     await bot.set_my_commands(commands_ru, language_code="ru")
     await bot.set_my_commands(commands_en, language_code="en")
     await bot.set_my_commands(commands_ky, language_code="ky")
+    logging.info("Bot commands configured; profile name/description updates are skipped to avoid Telegram flood limits")
+    return
     try:
         await bot.set_my_name(name=settings.service_name)
         await bot.set_my_name(name=settings.service_name, language_code="ru")
