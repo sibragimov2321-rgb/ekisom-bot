@@ -121,12 +121,14 @@ class BookmakerApiConfig:
 
     @property
     def is_configured(self) -> bool:
+        # The public CashdeskBotAPI user lookup authenticates requests with
+        # hash, cashierpass and cashdeskid.  The cashier login is issued by
+        # the provider too, but is not sent by the documented API methods.
         return all(
             (
                 self.api_hash,
                 self.cashier_password,
                 self.cashdesk_id,
-                self.login,
             )
         )
 
@@ -139,8 +141,6 @@ class BookmakerApiConfig:
             missing.append(f"{self.prefix}_CASHIER_PASSWORD")
         if not self.cashdesk_id:
             missing.append(f"{self.prefix}_CASHDESK_ID")
-        if not self.login:
-            missing.append(f"{self.prefix}_LOGIN")
         return tuple(missing)
 
 
