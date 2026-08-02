@@ -113,6 +113,7 @@ class BookmakerApiConfig:
     platform: str
     prefix: str
     base_url: str
+    api_key: str
     api_hash: str
     cashier_password: str
     cashdesk_id: str
@@ -120,10 +121,13 @@ class BookmakerApiConfig:
     allowed_currency_ids: frozenset[str]
 
     @property
+    def uses_public_api(self) -> bool:
+        return bool(self.api_key)
+
+    @property
     def is_configured(self) -> bool:
-        # The public CashdeskBotAPI user lookup authenticates requests with
-        # hash, cashierpass and cashdeskid.  The cashier login is issued by
-        # the provider too, but is not sent by the documented API methods.
+        if self.uses_public_api:
+            return True
         return all(
             (
                 self.api_hash,
@@ -134,6 +138,8 @@ class BookmakerApiConfig:
 
     @property
     def missing_fields(self) -> tuple[str, ...]:
+        if self.uses_public_api:
+            return ()
         missing: list[str] = []
         if not self.api_hash:
             missing.append(f"{self.prefix}_API_HASH")
@@ -199,6 +205,11 @@ def _load_bookmaker_apis(platforms: tuple[str, ...]) -> dict[str, BookmakerApiCo
             platform=platform,
             prefix=prefix,
             base_url=base_url,
+            api_key=(
+                os.getenv(f"{prefix}_API_KEY", "").strip()
+                or os.getenv(f"{prefix}_X_API_KEY", "").strip()
+                or os.getenv(f"{prefix}_PUBLIC_API_KEY", "").strip()
+            ),
             api_hash=os.getenv(f"{prefix}_API_HASH", "").strip(),
             cashier_password=os.getenv(f"{prefix}_CASHIER_PASSWORD", "").strip(),
             cashdesk_id=os.getenv(f"{prefix}_CASHDESK_ID", "").strip(),
