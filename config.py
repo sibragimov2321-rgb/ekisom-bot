@@ -209,6 +209,7 @@ def _load_bookmaker_apis(platforms: tuple[str, ...]) -> dict[str, BookmakerApiCo
                 os.getenv(f"{prefix}_API_KEY", "").strip()
                 or os.getenv(f"{prefix}_X_API_KEY", "").strip()
                 or os.getenv(f"{prefix}_PUBLIC_API_KEY", "").strip()
+                or (os.getenv(f"{prefix}_API_HASH", "").strip() if prefix == "ONEWIN" else "")
             ),
             api_hash=os.getenv(f"{prefix}_API_HASH", "").strip(),
             cashier_password=os.getenv(f"{prefix}_CASHIER_PASSWORD", "").strip(),
