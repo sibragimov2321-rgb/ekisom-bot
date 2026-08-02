@@ -1397,6 +1397,21 @@ async def verify_bookmaker_account(
         )
         return False
 
+    if cfg.uses_public_api:
+        # The public 1WIN API intentionally has no read-only user endpoint.
+        # A deposit request is the first safe server-side validation and is made
+        # only after the administrator confirms the customer's payment.
+        await state.update_data(bookmaker_account_name=None, bookmaker_currency_id=None)
+        await message.answer(
+            translate(
+                language,
+                "✅ ID принят. 1WIN проверит его при зачислении платежа.",
+                "✅ ID accepted. 1WIN will verify it when the payment is credited.",
+                "✅ ID кабыл алынды. 1WIN аны төлөм эсептелгенде текшерет.",
+            )
+        )
+        return True
+
     try:
         account = await find_bookmaker_user(cfg, account_id)
     except BookmakerApiError as exc:
