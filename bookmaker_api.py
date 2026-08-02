@@ -194,6 +194,25 @@ async def add_bookmaker_deposit(
     language: str = "ru",
     timeout_seconds: int = 20,
 ) -> dict[str, Any]:
+    if cfg.uses_public_api:
+        if not user_id.isdigit():
+            raise BookmakerApiError("1WIN: user ID must contain digits only")
+        amount = float(Decimal(amount_minor) / Decimal(100))
+        url = "https://api.1win.win/v1/client/deposit"
+        headers = {"X-API-KEY": cfg.api_key}
+        body = {"userId": int(user_id), "amount": amount}
+        try:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=timeout_seconds)
+            ) as session:
+                async with session.post(url, json=body, headers=headers) as response:
+                    data = await _read_json(response)
+        except aiohttp.ClientError as exc:
+            raise BookmakerApiError("1WIN: connection error") from exc
+        if not isinstance(data, dict):
+            raise BookmakerApiError("1WIN: unexpected API response")
+        return data
+
     if not cfg.is_configured:
         raise BookmakerApiError(f"{cfg.platform}: API is not configured")
 
