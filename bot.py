@@ -1085,6 +1085,10 @@ async def show_main_menu(message: Message, user: User) -> None:
         return f'<tg-emoji emoji-id="{custom_emoji_id}">{fallback}</tg-emoji>'
 
     greeting = (
+        f"<blockquote>Привет, {html.escape(user.first_name)}! 💬</blockquote>\n\n"
+        f"Пополнение и вывод {message_emoji('DEPOSIT', '🟢')} "
+        f"{message_emoji('WITHDRAW', '🔴')}\n\n"
+        "<blockquote>🛡 Защищенные транзакции 💬</blockquote>\n\n"
         "<blockquote>"
         f"{message_emoji('DEPOSIT_INFO', '🟢')} Пополнение: 5–15 сек\n"
         f"{message_emoji('FAST', '🔴')} Быстрые выводы\n\n"
