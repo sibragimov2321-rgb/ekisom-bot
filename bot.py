@@ -1467,6 +1467,8 @@ async def credit_deposit_with_bookmaker_api(
     operation: Operation,
     language: str,
 ) -> tuple[str, str | None]:
+    if not settings.bookmaker_api_auto_credit_enabled:
+        return "skipped", None
     if operation.kind != "deposit" or not operation.platform or not operation.platform_account_id:
         return "skipped", None
     cfg = bookmaker_config_for_platform(operation.platform)
