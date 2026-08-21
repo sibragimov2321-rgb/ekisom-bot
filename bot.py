@@ -262,7 +262,6 @@ def build_user_main_menu(language: str) -> ReplyKeyboardMarkup:
                         else f"🟢 {MAIN_LABELS['deposit'][lang]}"
                     ),
                     icon_custom_emoji_id=deposit_icon,
-                    style="success",
                 ),
                 KeyboardButton(
                     text=(
@@ -271,7 +270,6 @@ def build_user_main_menu(language: str) -> ReplyKeyboardMarkup:
                         else f"🔴 {MAIN_LABELS['withdrawal'][lang]}"
                     ),
                     icon_custom_emoji_id=withdraw_icon,
-                    style="danger",
                 ),
             ],
             [
@@ -282,7 +280,6 @@ def build_user_main_menu(language: str) -> ReplyKeyboardMarkup:
                         else f"🌐 {MAIN_LABELS['invite'][lang]}"
                     ),
                     icon_custom_emoji_id=invite_icon,
-                    style="success",
                 ),
             ],
         ],
@@ -1088,7 +1085,7 @@ async def show_main_menu(message: Message, user: User) -> None:
         f"<blockquote>Привет, {html.escape(user.first_name)}! 💬</blockquote>\n\n"
         f"Пополнение и вывод {message_emoji('DEPOSIT', '🟢')} "
         f"{message_emoji('WITHDRAW', '🔴')}\n\n"
-        "<blockquote>🛡 Защищенные транзакции 💬</blockquote>\n\n"
+        f"<blockquote>{message_emoji('SECURITY', '🛡')} Защищенные транзакции 💬</blockquote>\n\n"
         "<blockquote>"
         f"{message_emoji('DEPOSIT_INFO', '🟢')} Пополнение: 5–15 сек\n"
         f"{message_emoji('FAST', '🔴')} Быстрые выводы\n\n"
