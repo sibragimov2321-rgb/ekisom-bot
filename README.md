@@ -173,6 +173,23 @@ BOOKMAKER_API_AUTO_CREDIT_ENABLED=false
 `BOOKMAKER_API_AUTO_CREDIT_ENABLED=true` только после успешной проверки ID и
 чека в рабочем сервисе.
 
+## Custom Emoji
+
+Анимированные Custom Emoji для главных кнопок задаются только в Railway:
+
+```env
+EMOJI_DEPOSIT_ID=
+EMOJI_WITHDRAW_ID=
+EMOJI_INVITE_ID=
+EMOJI_SECURITY_ID=
+EMOJI_FAST_ID=
+EMOJI_WORKING_ID=
+```
+
+Администратор может отправить команду `/emojiid`, затем переслать боту один
+или несколько Custom Emoji. Бот вернёт их ID для переноса в Railway. Если ID
+не заданы, используется обычный Unicode fallback.
+
 Для 1XBET:
 
 ```env

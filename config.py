@@ -171,6 +171,7 @@ class Settings:
     platforms: tuple[str, ...]
     bookmaker_apis: dict[str, BookmakerApiConfig]
     bookmaker_api_auto_credit_enabled: bool
+    custom_emoji_ids: dict[str, str]
     platform_icon_custom_emoji_ids: dict[str, str]
     payment_methods: tuple[PaymentMethod, ...]
     payment_qr_image: str | None
@@ -260,6 +261,22 @@ def load_settings() -> Settings:
             raise RuntimeError(f"{env_name} должен содержать числовой ID")
         if custom_emoji_id:
             platform_icon_custom_emoji_ids[platform] = custom_emoji_id
+
+    custom_emoji_ids: dict[str, str] = {}
+    for emoji_name in (
+        "DEPOSIT",
+        "WITHDRAW",
+        "INVITE",
+        "SECURITY",
+        "FAST",
+        "WORKING",
+    ):
+        env_name = f"EMOJI_{emoji_name}_ID"
+        custom_emoji_id = os.getenv(env_name, "").strip()
+        if custom_emoji_id and not custom_emoji_id.isdigit():
+            raise RuntimeError(f"{env_name} должен содержать числовой ID")
+        if custom_emoji_id:
+            custom_emoji_ids[emoji_name] = custom_emoji_id
 
     default_instructions = os.getenv(
         "DEPOSIT_INSTRUCTIONS",
@@ -400,6 +417,7 @@ def load_settings() -> Settings:
             os.getenv("BOOKMAKER_API_AUTO_CREDIT_ENABLED", "false"),
             "BOOKMAKER_API_AUTO_CREDIT_ENABLED",
         ),
+        custom_emoji_ids=custom_emoji_ids,
         platform_icon_custom_emoji_ids=platform_icon_custom_emoji_ids,
         payment_methods=tuple(methods),
         payment_qr_image=payment_qr_image,
