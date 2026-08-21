@@ -52,6 +52,17 @@ def _csv(raw: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in raw.split(",") if item.strip())
 
 
+def _env_bool(raw: str, name: str, *, default: bool = False) -> bool:
+    value = raw.strip().lower()
+    if not value:
+        return default
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"{name} должен быть true или false")
+
+
 def _env_key(value: str) -> str:
     key = re.sub(r"[^A-Z0-9]+", "_", value.upper()).strip("_")
     return key or "METHOD"
@@ -159,6 +170,7 @@ class Settings:
     currency: str
     platforms: tuple[str, ...]
     bookmaker_apis: dict[str, BookmakerApiConfig]
+    bookmaker_api_auto_credit_enabled: bool
     platform_icon_custom_emoji_ids: dict[str, str]
     payment_methods: tuple[PaymentMethod, ...]
     payment_qr_image: str | None
@@ -384,6 +396,10 @@ def load_settings() -> Settings:
         currency=currency,
         platforms=platforms,
         bookmaker_apis=_load_bookmaker_apis(platforms),
+        bookmaker_api_auto_credit_enabled=_env_bool(
+            os.getenv("BOOKMAKER_API_AUTO_CREDIT_ENABLED", "false"),
+            "BOOKMAKER_API_AUTO_CREDIT_ENABLED",
+        ),
         platform_icon_custom_emoji_ids=platform_icon_custom_emoji_ids,
         payment_methods=tuple(methods),
         payment_qr_image=payment_qr_image,

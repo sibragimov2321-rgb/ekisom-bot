@@ -39,7 +39,9 @@ from admin_panel import (
     admin_router,
     audit_event,
     configure_admin_panel,
+    deny_admin_callback,
     show_admin_home,
+    is_admin,
 )
 from bookmaker_api import (
     BookmakerApiError,
@@ -128,6 +130,8 @@ SUPPORTED_LANGUAGES = {"ru", "en", "ky"}
 MAIN_LABELS = {
     "deposit": {"ru": "Пополнить", "en": "Deposit", "ky": "Толуктоо"},
     "withdrawal": {"ru": "Вывести", "en": "Withdraw", "ky": "Чыгаруу"},
+    "invite": {"ru": "🌐 Пригласить друга", "en": "🌐 Invite a friend", "ky": "🌐 Дос чакыруу"},
+    "admin": {"ru": "⚙️ Панель управления", "en": "⚙️ Control panel", "ky": "⚙️ Башкаруу панели"},
     "profile": {"ru": "Профиль", "en": "Profile", "ky": "Профиль"},
     "terms": {
         "ru": "Соглашение и правила",
@@ -242,31 +246,40 @@ def localize(user_id: int, ru: str, en: str, ky: str | None = None) -> str:
     return translate(get_language(user_id), ru, en, ky)
 
 
-def main_keyboard(language: str) -> ReplyKeyboardMarkup:
+def build_user_main_menu(language: str) -> ReplyKeyboardMarkup:
     lang = language if language in SUPPORTED_LANGUAGES else "ru"
     return ReplyKeyboardMarkup(
         keyboard=[
             [
                 KeyboardButton(
-                    text=MAIN_LABELS["deposit"][lang], style="success"
+                    text=f"🟢 {MAIN_LABELS['deposit'][lang]}", style="success"
                 ),
                 KeyboardButton(
-                    text=MAIN_LABELS["withdrawal"][lang], style="success"
-                ),
-            ],
-            [
-                KeyboardButton(
-                    text=MAIN_LABELS["support"][lang], style="success"
+                    text=f"🔴 {MAIN_LABELS['withdrawal'][lang]}", style="danger"
                 ),
             ],
             [
                 KeyboardButton(
-                    text=MAIN_LABELS["language"][lang], style="success"
+                    text=MAIN_LABELS["invite"][lang], style="success"
                 ),
             ],
         ],
         resize_keyboard=True,
     )
+
+
+def build_admin_main_menu(language: str) -> ReplyKeyboardMarkup:
+    menu = build_user_main_menu(language)
+    lang = language if language in SUPPORTED_LANGUAGES else "ru"
+    menu.keyboard.append(
+        [KeyboardButton(text=MAIN_LABELS["admin"][lang], style="success")]
+    )
+    return menu
+
+
+def main_keyboard(language: str) -> ReplyKeyboardMarkup:
+    """Compatibility wrapper for existing payment flows: always user-safe."""
+    return build_user_main_menu(language)
 
 
 def platforms_reply_keyboard(language: str) -> ReplyKeyboardMarkup:
@@ -1067,16 +1080,16 @@ async def show_main_menu(message: Message, user: User) -> None:
         )
     else:
         greeting = (
-            f"Привет, {html.escape(user.first_name)} | "
-            f"<b>{html.escape(settings.service_name)}</b>! 🟢\n\n"
-            "🟢 Пополнение | Вывод\n\n"
-            "🛬 Пополнение — 0%\n"
-            "🛫 Вывод — 0%\n"
-            "🌐 Работаем 24/7\n\n"
-            f"👨‍💼 Оператор: {html.escape(operator)}\n\n"
-            "🛡️ Финансовый контроль обеспечен личным отделом безопасности."
+            f"Привет, {html.escape(user.first_name)}!\n\n"
+            "<blockquote><b>🟢 Пополнение и вывод 🔴</b>\n\n"
+            "🛡 Защищенные транзакции\n\n"
+            "▶ Пополнение: 5–15 сек\n"
+            "⚡ Быстрые выводы\n\n"
+            "✅ Работаем 24/7!</blockquote>\n\n"
+            f"📝 Оператор: {html.escape(operator)}"
         )
-    await message.answer(greeting, reply_markup=main_keyboard(language))
+    menu = build_admin_main_menu(language) if is_admin(user.id) else build_user_main_menu(language)
+    await message.answer(greeting, reply_markup=menu)
 
 
 def admin_operation_text(operation: Operation, user: User | None = None) -> str:
@@ -1467,6 +1480,8 @@ async def credit_deposit_with_bookmaker_api(
     operation: Operation,
     language: str,
 ) -> tuple[str, str | None]:
+    if not settings.bookmaker_api_auto_credit_enabled:
+        return "skipped", None
     if operation.kind != "deposit" or not operation.platform or not operation.platform_account_id:
         return "skipped", None
     cfg = bookmaker_config_for_platform(operation.platform)
@@ -1854,7 +1869,10 @@ async def start(message: Message, state: FSMContext) -> None:
     profile = get_profile(message.from_user.id)
     if profile is None:
         return
-    await send_language_choice(message)
+    if profile.accepted_terms_at:
+        await show_main_menu(message, message.from_user)
+    else:
+        await send_language_choice(message)
 
 
 @router.message(Command("language"))
@@ -2005,6 +2023,9 @@ async def cancel_callback(callback: CallbackQuery, state: FSMContext) -> None:
             MAIN_LABELS["deposit"]["ru"],
             MAIN_LABELS["deposit"]["en"],
             MAIN_LABELS["deposit"]["ky"],
+            f"🟢 {MAIN_LABELS['deposit']['ru']}",
+            f"🟢 {MAIN_LABELS['deposit']['en']}",
+            f"🟢 {MAIN_LABELS['deposit']['ky']}",
             YELLOW_MAIN_LABELS["deposit"]["ru"],
             YELLOW_MAIN_LABELS["deposit"]["en"],
             YELLOW_MAIN_LABELS["deposit"]["ky"],
@@ -2027,6 +2048,9 @@ async def deposit_begin(message: Message, state: FSMContext) -> None:
             MAIN_LABELS["withdrawal"]["ru"],
             MAIN_LABELS["withdrawal"]["en"],
             MAIN_LABELS["withdrawal"]["ky"],
+            f"🔴 {MAIN_LABELS['withdrawal']['ru']}",
+            f"🔴 {MAIN_LABELS['withdrawal']['en']}",
+            f"🔴 {MAIN_LABELS['withdrawal']['ky']}",
             YELLOW_MAIN_LABELS["withdrawal"]["ru"],
             YELLOW_MAIN_LABELS["withdrawal"]["en"],
             YELLOW_MAIN_LABELS["withdrawal"]["ky"],
@@ -2040,6 +2064,34 @@ async def withdrawal_begin(message: Message, state: FSMContext) -> None:
     if await ensure_ready(message) is None:
         return
     await begin_platform_flow(message, state, "withdrawal")
+
+
+@router.message(
+    F.text.in_(
+        {
+            MAIN_LABELS["invite"]["ru"],
+            MAIN_LABELS["invite"]["en"],
+            MAIN_LABELS["invite"]["ky"],
+        }
+    )
+)
+async def invite_friend_handler(message: Message) -> None:
+    profile = await ensure_ready(message)
+    if profile is None:
+        return
+    referral_link = (
+        f"https://t.me/{bot_username}?start={profile.telegram_id}"
+        if bot_username
+        else "—"
+    )
+    await message.answer(
+        localize(
+            profile.telegram_id,
+            f"🌐 <b>Пригласите друга</b>\n\nВаша ссылка:\n<code>{html.escape(referral_link)}</code>",
+            f"🌐 <b>Invite a friend</b>\n\nYour link:\n<code>{html.escape(referral_link)}</code>",
+            f"🌐 <b>Дос чакыруу</b>\n\nСиздин шилтеме:\n<code>{html.escape(referral_link)}</code>",
+        )
+    )
 
 
 @router.message(
@@ -2888,13 +2940,40 @@ async def user_operations(message: Message) -> None:
 
 @router.message(Command("admin"))
 async def admin_panel(message: Message) -> None:
+    if message.from_user is None or not is_admin(message.from_user.id):
+        if message.from_user is not None:
+            await message.answer(
+                "⛔ У вас нет доступа к панели управления.",
+                reply_markup=build_user_main_menu(get_language(message.from_user.id)),
+            )
+        return
+    await show_admin_home(message)
+
+
+@router.message(
+    F.text.in_(
+        {
+            MAIN_LABELS["admin"]["ru"],
+            MAIN_LABELS["admin"]["en"],
+            MAIN_LABELS["admin"]["ky"],
+        }
+    )
+)
+async def admin_menu_button(message: Message) -> None:
+    if message.from_user is None or not is_admin(message.from_user.id):
+        if message.from_user is not None:
+            await message.answer(
+                "⛔ У вас нет доступа к панели управления.",
+                reply_markup=build_user_main_menu(get_language(message.from_user.id)),
+            )
+        return
     await show_admin_home(message)
 
 
 @router.callback_query(F.data.startswith("operation:"))
 async def process_operation(callback: CallbackQuery, bot: Bot) -> None:
-    if database.get_staff_role(callback.from_user.id) is None:
-        await callback.answer("Недостаточно прав.", show_alert=True)
+    if not is_admin(callback.from_user.id):
+        await deny_admin_callback(callback)
         return
     parts = (callback.data or "").split(":")
     if len(parts) != 3 or parts[1] not in {"approve", "reject"}:
@@ -3126,7 +3205,11 @@ async def main() -> None:
         settings.platforms,
         tuple((method.key, method.name) for method in settings.payment_methods),
     )
-    configure_admin_panel(database, settings)
+    configure_admin_panel(
+        database,
+        settings,
+        lambda user_id: build_user_main_menu(get_language(user_id)),
+    )
 
     bot = Bot(
         token=settings.bot_token,
