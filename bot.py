@@ -40,6 +40,7 @@ from admin_panel import (
     audit_event,
     configure_admin_panel,
     deny_admin_callback,
+    deny_admin_message,
     show_admin_home,
     is_admin,
 )
@@ -221,6 +222,10 @@ class ReferralFlow(StatesGroup):
     account_id = State()
 
 
+class EmojiIdFlow(StatesGroup):
+    waiting = State()
+
+
 def register_user(user: User) -> None:
     database.upsert_user(user.id, user.username, user.full_name)
 
@@ -248,19 +253,36 @@ def localize(user_id: int, ru: str, en: str, ky: str | None = None) -> str:
 
 def build_user_main_menu(language: str) -> ReplyKeyboardMarkup:
     lang = language if language in SUPPORTED_LANGUAGES else "ru"
+    deposit_icon = settings.custom_emoji_ids.get("DEPOSIT")
+    withdraw_icon = settings.custom_emoji_ids.get("WITHDRAW")
+    invite_icon = settings.custom_emoji_ids.get("INVITE")
     return ReplyKeyboardMarkup(
         keyboard=[
             [
                 KeyboardButton(
-                    text=f"🟢 {MAIN_LABELS['deposit'][lang]}", style="success"
+                    text=(
+                        MAIN_LABELS["deposit"][lang]
+                        if deposit_icon
+                        else f"🟢 {MAIN_LABELS['deposit'][lang]}"
+                    ),
+                    icon_custom_emoji_id=deposit_icon,
+                    style="success",
                 ),
                 KeyboardButton(
-                    text=f"🔴 {MAIN_LABELS['withdrawal'][lang]}", style="danger"
+                    text=(
+                        MAIN_LABELS["withdrawal"][lang]
+                        if withdraw_icon
+                        else f"🔴 {MAIN_LABELS['withdrawal'][lang]}"
+                    ),
+                    icon_custom_emoji_id=withdraw_icon,
+                    style="danger",
                 ),
             ],
             [
                 KeyboardButton(
-                    text=MAIN_LABELS["invite"][lang], style="success"
+                    text=MAIN_LABELS["invite"][lang],
+                    icon_custom_emoji_id=invite_icon,
+                    style="success",
                 ),
             ],
         ],
@@ -1090,6 +1112,52 @@ async def show_main_menu(message: Message, user: User) -> None:
         )
     menu = build_admin_main_menu(language) if is_admin(user.id) else build_user_main_menu(language)
     await message.answer(greeting, reply_markup=menu)
+
+
+def _utf16_entity_text(text: str, offset: int, length: int) -> str:
+    encoded = text.encode("utf-16-le")
+    start = offset * 2
+    end = start + length * 2
+    return encoded[start:end].decode("utf-16-le", errors="replace")
+
+
+@router.message(Command("emojiid"))
+async def emoji_id_command(message: Message, state: FSMContext) -> None:
+    if message.from_user is None or not is_admin(message.from_user.id):
+        if message.from_user is not None:
+            await deny_admin_message(message)
+        return
+    await state.set_state(EmojiIdFlow.waiting)
+    await message.answer("Отправьте Custom Emoji.")
+
+
+@router.message(EmojiIdFlow.waiting, F.entities)
+async def emoji_id_capture(message: Message, state: FSMContext) -> None:
+    entities = [
+        entity
+        for entity in (message.entities or [])
+        if entity.type == "custom_emoji" and entity.custom_emoji_id
+    ]
+    if not entities:
+        await message.answer("В сообщении не найден Custom Emoji. Отправьте его ещё раз.")
+        return
+    source_text = message.text or message.caption or ""
+    lines = ["Emoji:"]
+    for index, entity in enumerate(entities, start=1):
+        emoji_text = _utf16_entity_text(source_text, entity.offset, entity.length)
+        lines.extend(
+            [
+                f"{index}. {html.escape(emoji_text)}",
+                f"custom_emoji_id: <code>{html.escape(entity.custom_emoji_id or '')}</code>",
+            ]
+        )
+    await state.clear()
+    await message.answer("\n".join(lines))
+
+
+@router.message(EmojiIdFlow.waiting)
+async def emoji_id_invalid(message: Message) -> None:
+    await message.answer("Отправьте Custom Emoji.")
 
 
 def admin_operation_text(operation: Operation, user: User | None = None) -> str:
