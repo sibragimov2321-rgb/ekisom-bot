@@ -179,11 +179,13 @@ BOOKMAKER_API_AUTO_CREDIT_ENABLED=false
 
 ```env
 EMOJI_DEPOSIT_ID=
+EMOJI_DEPOSIT_INFO_ID=
 EMOJI_WITHDRAW_ID=
 EMOJI_INVITE_ID=
 EMOJI_SECURITY_ID=
 EMOJI_FAST_ID=
 EMOJI_WORKING_ID=
+EMOJI_OPERATOR_ID=
 ```
 
 Администратор может отправить команду `/emojiid`, затем переслать боту один
