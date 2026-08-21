@@ -129,9 +129,9 @@ SUPPORTED_LANGUAGES = {"ru"}
 
 
 MAIN_LABELS = {
-    "deposit": {"ru": "Пополнить", "en": "Deposit", "ky": "Толуктоо"},
-    "withdrawal": {"ru": "Вывести", "en": "Withdraw", "ky": "Чыгаруу"},
-    "invite": {"ru": "🌐 Пригласить друга", "en": "🌐 Invite a friend", "ky": "🌐 Дос чакыруу"},
+    "deposit": {"ru": "Пополнение", "en": "Deposit", "ky": "Толуктоо"},
+    "withdrawal": {"ru": "Вывод", "en": "Withdraw", "ky": "Чыгаруу"},
+    "invite": {"ru": "Пригласить друга", "en": "Invite a friend", "ky": "Дос чакыруу"},
     "admin": {"ru": "⚙️ Панель управления", "en": "⚙️ Control panel", "ky": "⚙️ Башкаруу панели"},
     "profile": {"ru": "Профиль", "en": "Profile", "ky": "Профиль"},
     "terms": {
@@ -280,7 +280,11 @@ def build_user_main_menu(language: str) -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(
-                    text=MAIN_LABELS["invite"][lang],
+                    text=(
+                        MAIN_LABELS["invite"][lang]
+                        if invite_icon
+                        else f"🌐 {MAIN_LABELS['invite'][lang]}"
+                    ),
                     icon_custom_emoji_id=invite_icon,
                     style="success",
                 ),
@@ -1078,38 +1082,20 @@ async def show_main_menu(message: Message, user: User) -> None:
         or settings.support_username
         or "не настроен"
     )
-    if language == "en":
-        greeting = (
-            f"Hello, {html.escape(user.first_name)} | "
-            f"<b>{html.escape(settings.service_name)}</b>! 🟢\n\n"
-            "🟢 Deposit | Withdrawal\n\n"
-            "🛬 Deposit — 0%\n"
-            "🛫 Withdrawal — 0%\n"
-            "🌐 Available 24/7\n\n"
-            f"👨‍💼 Operator: {html.escape(operator)}\n\n"
-            "🛡️ Financial control is handled by a dedicated security team."
-        )
-    elif language == "ky":
-        greeting = (
-            f"Салам, {html.escape(user.first_name)} | "
-            f"<b>{html.escape(settings.service_name)}</b>! 🟢\n\n"
-            "🟢 Толуктоо | Чыгаруу\n\n"
-            "🛬 Толуктоо — 0%\n"
-            "🛫 Чыгаруу — 0%\n"
-            "🌐 24/7 иштейбиз\n\n"
-            f"👨‍💼 Оператор: {html.escape(operator)}\n\n"
-            "🛡️ Каржылык көзөмөлдү өзүнчө коопсуздук бөлүмү камсыздайт."
-        )
-    else:
-        greeting = (
-            f"Привет, {html.escape(user.first_name)}!\n\n"
-            "<blockquote><b>🟢 Пополнение и вывод 🔴</b>\n\n"
-            "🛡 Защищенные транзакции\n\n"
-            "▶ Пополнение: 5–15 сек\n"
-            "⚡ Быстрые выводы\n\n"
-            "✅ Работаем 24/7!</blockquote>\n\n"
-            f"📝 Оператор: {html.escape(operator)}"
-        )
+    def message_emoji(name: str, fallback: str) -> str:
+        custom_emoji_id = settings.custom_emoji_ids.get(name)
+        if not custom_emoji_id:
+            return fallback
+        return f'<tg-emoji emoji-id="{custom_emoji_id}">{fallback}</tg-emoji>'
+
+    greeting = (
+        "<blockquote>"
+        f"{message_emoji('DEPOSIT', '🟢')} Пополнение: 5–15 сек\n"
+        f"{message_emoji('WITHDRAW', '🔴')} Быстрые выводы\n\n"
+        f"{message_emoji('WORKING', '✅')} Работаем 24/7!"
+        "</blockquote>\n\n"
+        f"{message_emoji('SECURITY', '📝')} Оператор: {html.escape(operator)}"
+    )
     menu = build_admin_main_menu(language) if is_admin(user.id) else build_user_main_menu(language)
     await message.answer(greeting, reply_markup=menu)
 
@@ -2050,6 +2036,8 @@ async def cancel_callback(callback: CallbackQuery, state: FSMContext) -> None:
             f"🟢 {MAIN_LABELS['deposit']['ru']}",
             f"🟢 {MAIN_LABELS['deposit']['en']}",
             f"🟢 {MAIN_LABELS['deposit']['ky']}",
+            "Пополнить",
+            "🟢 Пополнить",
             YELLOW_MAIN_LABELS["deposit"]["ru"],
             YELLOW_MAIN_LABELS["deposit"]["en"],
             YELLOW_MAIN_LABELS["deposit"]["ky"],
@@ -2075,6 +2063,8 @@ async def deposit_begin(message: Message, state: FSMContext) -> None:
             f"🔴 {MAIN_LABELS['withdrawal']['ru']}",
             f"🔴 {MAIN_LABELS['withdrawal']['en']}",
             f"🔴 {MAIN_LABELS['withdrawal']['ky']}",
+            "Вывести",
+            "🔴 Вывести",
             YELLOW_MAIN_LABELS["withdrawal"]["ru"],
             YELLOW_MAIN_LABELS["withdrawal"]["en"],
             YELLOW_MAIN_LABELS["withdrawal"]["ky"],
@@ -2096,6 +2086,7 @@ async def withdrawal_begin(message: Message, state: FSMContext) -> None:
             MAIN_LABELS["invite"]["ru"],
             MAIN_LABELS["invite"]["en"],
             MAIN_LABELS["invite"]["ky"],
+            "🌐 Пригласить друга",
         }
     )
 )
