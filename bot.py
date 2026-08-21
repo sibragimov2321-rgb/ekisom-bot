@@ -1086,11 +1086,11 @@ async def show_main_menu(message: Message, user: User) -> None:
 
     greeting = (
         "<blockquote>"
-        f"{message_emoji('DEPOSIT', '🟢')} Пополнение: 5–15 сек\n"
-        f"{message_emoji('WITHDRAW', '🔴')} Быстрые выводы\n\n"
+        f"{message_emoji('DEPOSIT_INFO', '🟢')} Пополнение: 5–15 сек\n"
+        f"{message_emoji('FAST', '🔴')} Быстрые выводы\n\n"
         f"{message_emoji('WORKING', '✅')} Работаем 24/7!"
         "</blockquote>\n\n"
-        f"{message_emoji('SECURITY', '📝')} Оператор: {html.escape(operator)}"
+        f"{message_emoji('OPERATOR', '📝')} Оператор: {html.escape(operator)}"
     )
     menu = build_admin_main_menu(language) if is_admin(user.id) else build_user_main_menu(language)
     await message.answer(greeting, reply_markup=menu)

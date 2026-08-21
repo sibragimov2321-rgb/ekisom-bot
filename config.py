@@ -265,11 +265,13 @@ def load_settings() -> Settings:
     custom_emoji_ids: dict[str, str] = {}
     for emoji_name in (
         "DEPOSIT",
+        "DEPOSIT_INFO",
         "WITHDRAW",
         "INVITE",
         "SECURITY",
         "FAST",
         "WORKING",
+        "OPERATOR",
     ):
         env_name = f"EMOJI_{emoji_name}_ID"
         custom_emoji_id = os.getenv(env_name, "").strip()
