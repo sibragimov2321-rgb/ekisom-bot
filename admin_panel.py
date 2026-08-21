@@ -27,6 +27,7 @@ from database import Card, Database
 admin_router = Router(name="admin-panel")
 database: Database
 settings: Settings
+user_main_menu_factory: Callable[[int], Any] | None = None
 
 
 ROLE_LABELS = {
@@ -60,10 +61,15 @@ class AdminStates(StatesGroup):
     system_value = State()
 
 
-def configure_admin_panel(db: Database, app_settings: Settings) -> None:
-    global database, settings
+def configure_admin_panel(
+    db: Database,
+    app_settings: Settings,
+    main_menu_factory: Callable[[int], Any] | None = None,
+) -> None:
+    global database, settings, user_main_menu_factory
     database = db
     settings = app_settings
+    user_main_menu_factory = main_menu_factory
 
 
 def format_money(amount_minor: int) -> str:
@@ -108,6 +114,24 @@ def back_keyboard(callback_data: str = "ap:home") -> InlineKeyboardMarkup:
 
 def role_of(user_id: int) -> str | None:
     return database.get_staff_role(user_id)
+
+
+def is_admin(user_id: int) -> bool:
+    """Return whether a user has an active administrative staff role."""
+    return role_of(user_id) is not None
+
+
+async def deny_admin_callback(callback: CallbackQuery) -> None:
+    text = "⛔ У вас нет доступа к панели управления."
+    await callback.answer(text, show_alert=True)
+    if callback.message is not None:
+        markup = user_main_menu_factory(callback.from_user.id) if user_main_menu_factory else None
+        await callback.message.answer(text, reply_markup=markup)
+
+
+async def deny_admin_message(message: Message) -> None:
+    markup = user_main_menu_factory(message.from_user.id) if message.from_user and user_main_menu_factory else None
+    await message.answer("⛔ У вас нет доступа к панели управления.", reply_markup=markup)
 
 
 async def audit_event(
@@ -187,6 +211,25 @@ class AdminCallbackAuditMiddleware(BaseMiddleware):
         return await handler(event, data)
 
 
+class AdminAccessMiddleware(BaseMiddleware):
+    """Block forged administrative callback data before any panel handler runs."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        if (
+            isinstance(event, CallbackQuery)
+            and (event.data or "").startswith("ap:")
+            and not is_admin(event.from_user.id)
+        ):
+            await deny_admin_callback(event)
+            return None
+        return await handler(event, data)
+
+
 class MaintenanceMiddleware(BaseMiddleware):
     async def __call__(
         self,
@@ -217,6 +260,7 @@ class StaffFilter(BaseFilter):
         return bool(message.from_user and role_of(message.from_user.id))
 
 
+admin_router.callback_query.outer_middleware(AdminAccessMiddleware())
 admin_router.callback_query.outer_middleware(AdminCallbackAuditMiddleware())
 
 
@@ -225,7 +269,10 @@ async def require_callback_role(
 ) -> str | None:
     role = role_of(callback.from_user.id)
     if role not in allowed:
-        await callback.answer("Недостаточно прав.", show_alert=True)
+        if role is None:
+            await deny_admin_callback(callback)
+        else:
+            await callback.answer("Недостаточно прав.", show_alert=True)
         return None
     return role
 
@@ -235,7 +282,10 @@ async def require_message_role(message: Message, allowed: set[str]) -> str | Non
         return None
     role = role_of(message.from_user.id)
     if role not in allowed:
-        await message.answer("Недостаточно прав.")
+        if role is None:
+            await deny_admin_message(message)
+        else:
+            await message.answer("Недостаточно прав.")
         return None
     return role
 
@@ -313,9 +363,9 @@ async def show_admin_home(target: Message | CallbackQuery) -> None:
     role = role_of(user.id)
     if role is None:
         if isinstance(target, CallbackQuery):
-            await target.answer("Доступ запрещён.", show_alert=True)
+            await deny_admin_callback(target)
         else:
-            await target.answer("Команда доступна только сотрудникам.")
+            await deny_admin_message(target)
         return
     if role == "owner":
         is_off = database.get_setting_bool("maintenance_mode")
