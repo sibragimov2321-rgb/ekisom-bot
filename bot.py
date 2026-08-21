@@ -124,7 +124,7 @@ TERMS_KY = """
 """.strip()
 
 
-SUPPORTED_LANGUAGES = {"ru", "en", "ky"}
+SUPPORTED_LANGUAGES = {"ru"}
 
 
 MAIN_LABELS = {
@@ -1004,10 +1004,10 @@ def operation_status(status: str, language: str = "ru") -> str:
 
 
 async def send_language_choice(message: Message) -> None:
-    await message.answer(
-        "Выберите язык / Choose your language / Тилди тандаңыз:",
-        reply_markup=language_keyboard(),
-    )
+    if message.from_user is None:
+        return
+    database.set_language(message.from_user.id, "ru")
+    await show_main_menu(message, message.from_user)
 
 
 async def send_terms(
@@ -1866,13 +1866,8 @@ async def start(message: Message, state: FSMContext) -> None:
     if len(parts) == 2 and parts[1].isdigit():
         database.set_referrer(message.from_user.id, int(parts[1]))
 
-    profile = get_profile(message.from_user.id)
-    if profile is None:
-        return
-    if profile.accepted_terms_at:
-        await show_main_menu(message, message.from_user)
-    else:
-        await send_language_choice(message)
+    database.set_language(message.from_user.id, "ru")
+    await show_main_menu(message, message.from_user)
 
 
 @router.message(Command("language"))
@@ -1895,63 +1890,24 @@ async def language_command(message: Message, state: FSMContext) -> None:
     await state.clear()
     if message.from_user is not None:
         register_user(message.from_user)
-    await send_language_choice(message)
+        database.set_language(message.from_user.id, "ru")
+        await show_main_menu(message, message.from_user)
 
 
 @router.callback_query(F.data.startswith("language:"))
 async def language_callback(callback: CallbackQuery) -> None:
-    language = (callback.data or "").split(":", 1)[-1]
-    if language not in SUPPORTED_LANGUAGES:
-        await callback.answer("Invalid language", show_alert=True)
-        return
     register_user(callback.from_user)
-    database.set_language(callback.from_user.id, language)
+    database.set_language(callback.from_user.id, "ru")
     await callback.answer()
     if callback.message is not None:
-        await callback.message.answer(
-            translate(
-                language,
-                "Язык выбран: Русский",
-                "Language: English",
-                "Тандалган тил: Кыргызча",
-            )
-        )
-        profile = get_profile(callback.from_user.id)
-        if profile and profile.accepted_terms_at:
-            await show_main_menu(callback.message, callback.from_user)
-        else:
-            await send_terms(callback.message, language, True)
+        await show_main_menu(callback.message, callback.from_user)
 
 
 @router.callback_query(F.data.startswith("terms:"))
 async def terms_callback(callback: CallbackQuery) -> None:
-    action = (callback.data or "").split(":", 1)[-1]
-    language = get_language(callback.from_user.id)
-    if action == "decline":
-        await callback.answer(
-            translate(
-                language,
-                "Для использования сервиса необходимо принять правила.",
-                "Agreement is required to use the service.",
-                "Сервисти колдонуу үчүн эрежелерди кабыл алуу керек.",
-            ),
-            show_alert=True,
-        )
-        return
-    database.accept_terms(callback.from_user.id)
-    await callback.answer(
-        translate(language, "Условия приняты", "Accepted", "Шарттар кабыл алынды")
-    )
+    database.set_language(callback.from_user.id, "ru")
+    await callback.answer("Главное меню открыто")
     if callback.message is not None:
-        await callback.message.answer(
-            translate(
-                language,
-                "✅ Условия приняты. Личный кабинет готов к работе.",
-                "✅ Agreement accepted. Your account is ready.",
-                "✅ Шарттар кабыл алынды. Жеке кабинет колдонууга даяр.",
-            ),
-            reply_markup=main_keyboard(language),
-        )
         await show_main_menu(callback.message, callback.from_user)
 
 
@@ -2900,8 +2856,8 @@ async def terms_handler(message: Message) -> None:
     if message.from_user is None:
         return
     register_user(message.from_user)
-    language = get_language(message.from_user.id)
-    await send_terms(message, language, False)
+    database.set_language(message.from_user.id, "ru")
+    await show_main_menu(message, message.from_user)
 
 
 @router.message(Command("requests"))
@@ -3114,44 +3070,12 @@ async def unknown(message: Message) -> None:
 async def configure_bot_profile(bot: Bot) -> None:
     commands_ru = [
         BotCommand(command="start", description="Главное меню"),
-        BotCommand(command="deposit", description="Пополнить игровой счёт"),
-        BotCommand(command="withdraw", description="Вывести средства"),
-        BotCommand(command="profile", description="Личный кабинет"),
-        BotCommand(command="requests", description="Мои заявки"),
-        BotCommand(command="terms", description="Соглашение и правила"),
-        BotCommand(command="language", description="Изменить язык"),
-        BotCommand(command="cancel", description="Отменить действие"),
         BotCommand(command="admin", description="Панель управления"),
-        BotCommand(command="chatid", description="ID текущего чата"),
-    ]
-    commands_en = [
-        BotCommand(command="start", description="Main menu"),
-        BotCommand(command="deposit", description="Deposit to gaming account"),
-        BotCommand(command="withdraw", description="Withdraw funds"),
-        BotCommand(command="profile", description="Player account"),
-        BotCommand(command="requests", description="My requests"),
-        BotCommand(command="terms", description="Terms and rules"),
-        BotCommand(command="language", description="Change language"),
-        BotCommand(command="cancel", description="Cancel current action"),
-        BotCommand(command="admin", description="Admin panel"),
-        BotCommand(command="chatid", description="Current chat ID"),
-    ]
-    commands_ky = [
-        BotCommand(command="start", description="Башкы меню"),
-        BotCommand(command="deposit", description="Оюн эсебин толуктоо"),
-        BotCommand(command="withdraw", description="Каражат чыгаруу"),
-        BotCommand(command="profile", description="Жеке кабинет"),
-        BotCommand(command="requests", description="Менин өтүнмөлөрүм"),
-        BotCommand(command="terms", description="Келишим жана эрежелер"),
-        BotCommand(command="language", description="Тилди өзгөртүү"),
-        BotCommand(command="cancel", description="Аракетти жокко чыгаруу"),
-        BotCommand(command="admin", description="Башкаруу панели"),
-        BotCommand(command="chatid", description="Учурдагы чаттын ID-си"),
     ]
     await bot.set_my_commands(commands_ru)
     await bot.set_my_commands(commands_ru, language_code="ru")
-    await bot.set_my_commands(commands_en, language_code="en")
-    await bot.set_my_commands(commands_ky, language_code="ky")
+    await bot.delete_my_commands(language_code="en")
+    await bot.delete_my_commands(language_code="ky")
     logging.info("Bot commands configured; profile name/description updates are skipped to avoid Telegram flood limits")
     return
     try:
