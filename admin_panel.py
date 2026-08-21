@@ -8,7 +8,7 @@ from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware, Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
-from aiogram.filters import BaseFilter, Command
+from aiogram.filters import BaseFilter, Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -59,6 +59,7 @@ class AdminStates(StatesGroup):
     team_identifier = State()
     broadcast_content = State()
     system_value = State()
+    custom_emoji = State()
 
 
 def configure_admin_panel(
@@ -132,6 +133,54 @@ async def deny_admin_callback(callback: CallbackQuery) -> None:
 async def deny_admin_message(message: Message) -> None:
     markup = user_main_menu_factory(message.from_user.id) if message.from_user and user_main_menu_factory else None
     await message.answer("⛔ У вас нет доступа к панели управления.", reply_markup=markup)
+
+
+def _utf16_entity_text(text: str, offset: int, length: int) -> str:
+    encoded = text.encode("utf-16-le")
+    start = offset * 2
+    end = start + length * 2
+    return encoded[start:end].decode("utf-16-le", errors="replace")
+
+
+@admin_router.message(Command("emojiid"), StateFilter("*"))
+async def emoji_id_command(message: Message, state: FSMContext) -> None:
+    """Read Custom Emoji IDs without being blocked by another admin flow."""
+    if message.from_user is None or not is_admin(message.from_user.id):
+        if message.from_user is not None:
+            await deny_admin_message(message)
+        return
+    await state.clear()
+    await state.set_state(AdminStates.custom_emoji)
+    await message.answer("Отправьте Custom Emoji.")
+
+
+@admin_router.message(AdminStates.custom_emoji, F.entities)
+async def emoji_id_capture(message: Message, state: FSMContext) -> None:
+    entities = [
+        entity
+        for entity in (message.entities or [])
+        if entity.type == "custom_emoji" and entity.custom_emoji_id
+    ]
+    if not entities:
+        await message.answer("В сообщении не найден Custom Emoji. Отправьте его ещё раз.")
+        return
+    source_text = message.text or message.caption or ""
+    lines = ["Emoji:"]
+    for index, entity in enumerate(entities, start=1):
+        emoji_text = _utf16_entity_text(source_text, entity.offset, entity.length)
+        lines.extend(
+            [
+                f"{index}. {html.escape(emoji_text)}",
+                f"custom_emoji_id: <code>{html.escape(entity.custom_emoji_id or '')}</code>",
+            ]
+        )
+    await state.clear()
+    await message.answer("\n".join(lines))
+
+
+@admin_router.message(AdminStates.custom_emoji)
+async def emoji_id_invalid(message: Message) -> None:
+    await message.answer("Отправьте Custom Emoji.")
 
 
 async def audit_event(
