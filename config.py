@@ -170,6 +170,7 @@ class Settings:
     currency: str
     platforms: tuple[str, ...]
     bookmaker_apis: dict[str, BookmakerApiConfig]
+    bookmaker_account_validation_enabled: bool
     bookmaker_api_auto_credit_enabled: bool
     custom_emoji_ids: dict[str, str]
     platform_icon_custom_emoji_ids: dict[str, str]
@@ -292,7 +293,11 @@ def load_settings() -> Settings:
             f"PAYMENT_{key}_DETAILS",
             default_instructions,
         ).strip()
-        qr = os.getenv(f"PAYMENT_{key}_QR", "").strip() or None
+        default_qr = {
+            "MBANK": "assets/melbet_mbank_qr.png",
+            "BAKAI_BANK": "assets/melbet_bakai_qr.png",
+        }.get(key)
+        qr = os.getenv(f"PAYMENT_{key}_QR", "").strip() or default_qr
         url = os.getenv(f"PAYMENT_{key}_URL", "").strip() or None
         default_links = BANK_APP_LINKS.get(key, {})
         android_url = (
@@ -331,10 +336,8 @@ def load_settings() -> Settings:
     if not methods:
         raise RuntimeError("PAYMENT_METHODS не должен быть пустым")
 
-    payment_qr_image = (
-        os.getenv("PAYMENT_QR_IMAGE", "").strip()
-        or "universal_bank_qr.png"
-    )
+    # A QR is sent after the customer chooses a bank; no shared QR is needed.
+    payment_qr_image = None
     if payment_qr_image and not re.match(
         r"^(https?://|[A-Za-z0-9_-]{20,}$)", payment_qr_image
     ):
@@ -410,6 +413,7 @@ def load_settings() -> Settings:
         currency=currency,
         platforms=platforms,
         bookmaker_apis=_load_bookmaker_apis(platforms),
+        bookmaker_account_validation_enabled=False,
         bookmaker_api_auto_credit_enabled=_env_bool(
             os.getenv("BOOKMAKER_API_AUTO_CREDIT_ENABLED", "false"),
             "BOOKMAKER_API_AUTO_CREDIT_ENABLED",

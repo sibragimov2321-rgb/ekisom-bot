@@ -1369,6 +1369,12 @@ async def verify_bookmaker_account(
     platform: str,
     account_id: str,
 ) -> bool:
+    # The current flow deliberately accepts the entered gaming ID without an
+    # external lookup. It also stores no currency value for the account.
+    if not settings.bookmaker_account_validation_enabled:
+        await state.update_data(bookmaker_account_name=None, bookmaker_currency_id=None)
+        return True
+
     cfg = bookmaker_config_for_platform(platform)
     language = get_language(user_id)
     if cfg is None:
@@ -1452,17 +1458,6 @@ async def verify_bookmaker_account(
                 f"\n<code>cashdesk: {html.escape(cfg.cashdesk_id)}</code>"
             )
         await message.answer(text)
-        return False
-
-    if cfg.allowed_currency_ids and account.currency_id not in cfg.allowed_currency_ids:
-        await message.answer(
-            translate(
-                language,
-                "ℹ️ Аккаунт найден, но валюта аккаунта не подходит для этого бота.",
-                "ℹ️ Account found, but its currency is not allowed for this bot.",
-                "ℹ️ Аккаунт табылды, бирок валютасы бул ботко туура келбейт.",
-            )
-        )
         return False
 
     await state.update_data(
@@ -1675,9 +1670,9 @@ async def accept_deposit_amount(
 
     caption = translate(
         language,
-        f"📌 <b>Оплатите точную сумму:</b> <b>{format_money(total_minor)}</b>\n🎮 {html.escape(str(data['platform']))} ID: <code>{html.escape(str(data['account_id']))}</code>\n\n⚠️ После оплаты отправьте скриншот или файл чека.\n\n⏳ Время на оплату: <b>{settings.payment_timeout_seconds // 60:02d}:00</b>\n\nВыберите банк кнопкой под QR-кодом.",
-        f"📌 <b>Pay the exact amount:</b> <b>{format_money(total_minor)}</b>\n🎮 {html.escape(str(data['platform']))} ID: <code>{html.escape(str(data['account_id']))}</code>\n\n⚠️ After payment, send a receipt screenshot or file.\n\n⏳ Payment time: <b>{settings.payment_timeout_seconds // 60:02d}:00</b>\n\nChoose a bank using a button below.",
-        f"📌 <b>Так сумманы төлөңүз:</b> <b>{format_money(total_minor)}</b>\n🎮 {html.escape(str(data['platform']))} ID: <code>{html.escape(str(data['account_id']))}</code>\n\n⚠️ Төлөгөндөн кийин чектин скриншотун же файлын жөнөтүңүз.\n\n⏳ Төлөө убактысы: <b>{settings.payment_timeout_seconds // 60:02d}:00</b>\n\nQR-коддун астындагы баскыч менен банкты тандаңыз.",
+        f"📌 <b>Оплатите точную сумму:</b> <b>{format_money(total_minor)}</b>\n🎮 {html.escape(str(data['platform']))} ID: <code>{html.escape(str(data['account_id']))}</code>\n\n⚠️ После оплаты отправьте скриншот или файл чека.\n\n⏳ Время на оплату: <b>{settings.payment_timeout_seconds // 60:02d}:00</b>\n\nВыберите банк — его QR-код появится следующим сообщением.",
+        f"📌 <b>Pay the exact amount:</b> <b>{format_money(total_minor)}</b>\n🎮 {html.escape(str(data['platform']))} ID: <code>{html.escape(str(data['account_id']))}</code>\n\n⚠️ After payment, send a receipt screenshot or file.\n\n⏳ Payment time: <b>{settings.payment_timeout_seconds // 60:02d}:00</b>\n\nChoose a bank — its QR code will be sent next.",
+        f"📌 <b>Так сумманы төлөңүз:</b> <b>{format_money(total_minor)}</b>\n🎮 {html.escape(str(data['platform']))} ID: <code>{html.escape(str(data['account_id']))}</code>\n\n⚠️ Төлөгөндөн кийин чектин скриншотун же файлын жөнөтүңүз.\n\n⏳ Төлөө убактысы: <b>{settings.payment_timeout_seconds // 60:02d}:00</b>\n\nБанкты тандаңыз — анын QR-коду кийинки билдирүүдө чыгат.",
     )
     caption += translate(
         language,
@@ -1734,15 +1729,7 @@ async def accept_deposit_amount(
                 reply_markup=markup,
             )
     else:
-        prefix = (
-            ""
-            if has_managed_cards
-            else "⚠️ <b>QR-код ещё не настроен администратором.</b>\n\n"
-        )
-        sent = await message.answer(
-            prefix + caption,
-            reply_markup=markup,
-        )
+        sent = await message.answer(caption, reply_markup=markup)
     await state.update_data(payment_message_id=sent.message_id)
     if message.from_user is not None:
         await notify_payment_expected(
