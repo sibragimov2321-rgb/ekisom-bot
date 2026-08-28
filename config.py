@@ -245,14 +245,9 @@ def load_settings() -> Settings:
         raise RuntimeError("BOT_TOKEN выглядит неверно. Проверьте значение в файле .env.")
 
     currency = os.getenv("CURRENCY", "KGS").strip().upper() or "KGS"
-    platforms = _csv(
-        os.getenv(
-            "PLATFORMS",
-            "1XBET,MELBET,1WIN,MOSTBET,WINWIN,888STARZ",
-        )
-    )
-    if not platforms:
-        raise RuntimeError("PLATFORMS не должен быть пустым")
+    # The bot is single-brand. Do not read PLATFORMS here: an old Railway
+    # variable must not bring removed brands back into customer keyboards.
+    platforms = ("MELBET",)
     platform_icon_custom_emoji_ids: dict[str, str] = {}
     for platform in platforms:
         env_name = f"PLATFORM_{_env_key(platform)}_ICON_CUSTOM_EMOJI_ID"

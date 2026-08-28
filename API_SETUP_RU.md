@@ -18,19 +18,6 @@ BOOKMAKER_API_AUTO_CREDIT_ENABLED=false
 измените значение на `true` в Railway. Это значение не следует добавлять в
 GitHub вместе с ключами.
 
-## 1XBET
-
-Добавьте эти переменные:
-
-```env
-XBET_API_BASE_URL=https://partners.servcul.com/CashdeskBotAPI
-XBET_API_HASH=
-XBET_CASHIER_PASSWORD=
-XBET_CASHDESK_ID=
-XBET_LOGIN=
-XBET_ALLOWED_CURRENCY_IDS=
-```
-
 ## MELBET
 
 ```env
@@ -40,17 +27,6 @@ MELBET_CASHIER_PASSWORD=
 MELBET_CASHDESK_ID=
 MELBET_LOGIN=
 MELBET_ALLOWED_CURRENCY_IDS=
-```
-
-## 1WIN
-
-```env
-ONEWIN_API_BASE_URL=https://partners.servcul.com/CashdeskBotAPI
-ONEWIN_API_HASH=
-ONEWIN_CASHIER_PASSWORD=
-ONEWIN_CASHDESK_ID=
-ONEWIN_LOGIN=
-ONEWIN_ALLOWED_CURRENCY_IDS=
 ```
 
 ## Как это работает

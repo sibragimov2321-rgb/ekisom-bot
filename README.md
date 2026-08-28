@@ -120,7 +120,7 @@ ADMIN_IDS=6456456621
 SERVICE_NAME=MOMENTUM SERVICE
 SUPPORT_USERNAME=@username
 CURRENCY=KGS
-PLATFORMS=1XBET,MELBET,1WIN,MOSTBET,WINWIN,888STARZ
+PLATFORMS=MELBET
 MIN_DEPOSIT=35
 MAX_DEPOSIT=500000
 MIN_WITHDRAW=500
@@ -192,16 +192,15 @@ EMOJI_OPERATOR_ID=
 или несколько Custom Emoji. Бот вернёт их ID для переноса в Railway. Если ID
 не заданы, используется обычный Unicode fallback.
 
-Для 1XBET:
+Для MELBET:
 
 ```env
-XBET_API_BASE_URL=https://partners.servcul.com/CashdeskBotAPI
-XBET_API_HASH=
-XBET_CASHIER_PASSWORD=
-XBET_CASHDESK_ID=
-XBET_LOGIN=
-XBET_ALLOWED_CURRENCY_IDS=
+MELBET_API_BASE_URL=https://partners.servcul.com/CashdeskBotAPI
+MELBET_API_HASH=
+MELBET_CASHIER_PASSWORD=
+MELBET_CASHDESK_ID=
+MELBET_LOGIN=
+MELBET_ALLOWED_CURRENCY_IDS=
 ```
 
-Для MELBET используйте такие же поля с префиксом `MELBET_`, для 1WIN —
-с префиксом `ONEWIN_`. Подробно расписано в `API_SETUP_RU.md`.
+Подробная настройка описана в `API_SETUP_RU.md`.
