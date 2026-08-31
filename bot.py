@@ -274,12 +274,6 @@ def build_user_main_menu(language: str) -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(
-                    text=f"👨‍💼 {MAIN_LABELS['support'][lang]}",
-                    style="primary",
-                ),
-            ],
-            [
-                KeyboardButton(
                     text=(
                         MAIN_LABELS["invite"][lang]
                         if invite_icon
