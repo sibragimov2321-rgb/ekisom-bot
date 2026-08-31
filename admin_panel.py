@@ -114,6 +114,10 @@ def back_keyboard(callback_data: str = "ap:home") -> InlineKeyboardMarkup:
 
 
 def role_of(user_id: int) -> str | None:
+    # IDs configured in Railway are always owners. This keeps access stable if
+    # an empty/new SQLite database is created after a deployment.
+    if user_id in settings.admin_ids:
+        return "owner"
     return database.get_staff_role(user_id)
 
 
@@ -370,6 +374,12 @@ def home_markup(role: str) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="⚙️ Настройки", callback_data="ap:system")
+            ],
+            [
+                InlineKeyboardButton(
+                    text="👨‍💼 Сменить оператора",
+                    callback_data="ap:systemset:support_contact",
+                )
             ],
             [
                 InlineKeyboardButton(
