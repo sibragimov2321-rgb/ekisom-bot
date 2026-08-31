@@ -139,7 +139,7 @@ MAIN_LABELS = {
         "en": "Terms and rules",
         "ky": "Келишим жана эрежелер",
     },
-    "support": {"ru": "Тех поддержка", "en": "Support", "ky": "Колдоо"},
+    "support": {"ru": "Оператор", "en": "Operator", "ky": "Оператор"},
     "language": {"ru": "🌐 Язык", "en": "🌐 Language", "ky": "🌐 Тил"},
 }
 
@@ -270,6 +270,12 @@ def build_user_main_menu(language: str) -> ReplyKeyboardMarkup:
                         else f"🔴 {MAIN_LABELS['withdrawal'][lang]}"
                     ),
                     icon_custom_emoji_id=withdraw_icon,
+                ),
+            ],
+            [
+                KeyboardButton(
+                    text=f"👨‍💼 {MAIN_LABELS['support'][lang]}",
+                    style="primary",
                 ),
             ],
             [
@@ -2059,6 +2065,8 @@ async def invite_friend_handler(message: Message) -> None:
             LEGACY_MAIN_LABELS["support"]["ru"],
             LEGACY_MAIN_LABELS["support"]["en"],
             LEGACY_MAIN_LABELS["support"]["ky"],
+            "👨‍💼 Тех поддержка",
+            "Тех поддержка",
         }
     )
 )

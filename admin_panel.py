@@ -1618,7 +1618,7 @@ def system_markup() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="🆘 Контакт поддержки",
+                    text="👨‍💼 Оператор",
                     callback_data="ap:systemset:support_contact",
                 )
             ],
@@ -1654,7 +1654,7 @@ async def system_callback(callback: CallbackQuery) -> None:
     text = (
         "⚙️ <b>РЕДАКТИРОВАНИЕ СИСТЕМЫ</b>\n\n"
         f"🗂 Чат логов: <code>{html.escape(log_chat)}</code>\n"
-        f"🆘 Поддержка: {html.escape(support)}\n"
+        f"👨‍💼 Оператор: {html.escape(support)}\n"
         f"📄 Оферта: {'свой текст' if offer else 'стандартный текст'}\n"
         f"📥 Прибыль со ввода: "
         f"{html.escape(database.get_setting('profit_deposit_percent', '0'))}%\n"
@@ -1676,7 +1676,7 @@ async def system_set_callback(callback: CallbackQuery, state: FSMContext) -> Non
             "Добавьте бота в группу. ID можно узнать командой /chatid внутри группы."
         ),
         "support_contact": (
-            "Введите @username или полную HTTPS-ссылку поддержки."
+            "Введите @username или полную HTTPS-ссылку оператора."
         ),
         "offer_text": (
             "Отправьте новый полный текст оферты. Допускается до 3500 символов."
@@ -1736,7 +1736,7 @@ async def system_value_message(
     await state.clear()
     label = {
         "log_chat_id": "ID чата логов",
-        "support_contact": "контакт поддержки",
+        "support_contact": "оператор",
         "offer_text": "текст оферты",
         "profit_deposit_percent": "процент прибыли со ввода",
         "profit_withdraw_percent": "процент прибыли с вывода",
