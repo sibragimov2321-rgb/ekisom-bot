@@ -281,12 +281,8 @@ def load_settings() -> Settings:
         "После перевода отправьте боту фото или файл чека.",
     ).strip()
     methods: list[PaymentMethod] = []
-    for configured_name in _csv(
-        os.getenv(
-            "PAYMENT_METHODS",
-            "MBANK,OPTIMA,BAKAI_BANK,OMONEY,SIMBANK",
-        )
-    ):
+    # Older PAYMENT_METHODS variables must not restore other banks.
+    for configured_name in ("MBANK", "BAKAI_BANK"):
         key = _env_key(configured_name)
         name = BANK_LABELS.get(key, configured_name)
         details = os.getenv(
