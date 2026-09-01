@@ -1266,6 +1266,13 @@ def team_markup(role: str) -> InlineKeyboardMarkup:
         rows.append(
             [
                 InlineKeyboardButton(
+                    text="👑 Владельцы", callback_data="ap:teamlist:owner"
+                )
+            ]
+        )
+        rows.append(
+            [
+                InlineKeyboardButton(
                     text="👔 Управляющие", callback_data="ap:teamlist:supervisor"
                 )
             ]
@@ -1274,6 +1281,13 @@ def team_markup(role: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🛠 Менеджеры", callback_data="ap:teamlist:manager")]
     )
     if role == "owner":
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="➕ Владелец", callback_data="ap:teamadd:owner"
+                ),
+            ]
+        )
         rows.append(
             [
                 InlineKeyboardButton(
@@ -1305,7 +1319,7 @@ async def team_callback(callback: CallbackQuery) -> None:
     await replace_panel_message(
         callback,
         "👥 <b>КОМАНДА</b>\n\n"
-        "Просмотр, назначение и мгновенное прекращение доступа сотрудников.",
+        "Владелец имеет полный доступ. Управляющий и менеджер имеют ограниченные права.",
         team_markup(role),
     )
 
@@ -1316,7 +1330,7 @@ async def team_list_callback(callback: CallbackQuery) -> None:
     if actor_role is None:
         return
     target_role = (callback.data or "").rsplit(":", 1)[-1]
-    if target_role == "supervisor" and actor_role != "owner":
+    if target_role in {"owner", "supervisor"} and actor_role != "owner":
         await callback.answer("Недостаточно прав.", show_alert=True)
         return
     members = database.list_staff(target_role)
@@ -1332,7 +1346,11 @@ async def team_list_callback(callback: CallbackQuery) -> None:
             ]
         )
     rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="ap:team")])
-    title = "Управляющие" if target_role == "supervisor" else "Менеджеры"
+    title = {
+        "owner": "Владельцы",
+        "supervisor": "Управляющие",
+        "manager": "Менеджеры",
+    }.get(target_role, "Команда")
     text = f"👥 <b>{title}</b>\n\n" + (
         f"Всего: {len(members)}" if members else "Список пуст."
     )
@@ -1348,10 +1366,10 @@ async def team_add_callback(callback: CallbackQuery, state: FSMContext) -> None:
     if actor_role is None:
         return
     target_role = (callback.data or "").rsplit(":", 1)[-1]
-    if target_role == "supervisor" and actor_role != "owner":
+    if target_role in {"owner", "supervisor"} and actor_role != "owner":
         await callback.answer("Недостаточно прав.", show_alert=True)
         return
-    if target_role not in {"supervisor", "manager"}:
+    if target_role not in {"owner", "supervisor", "manager"}:
         await callback.answer("Неверная роль.", show_alert=True)
         return
     await state.update_data(admin_target_role=target_role)
@@ -1360,7 +1378,8 @@ async def team_add_callback(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.message:
         await callback.message.answer(
             "Введите Telegram ID или @username сотрудника.\n\n"
-            "Пользователь должен предварительно открыть бота и нажать /start."
+            "Пользователь должен предварительно открыть бота и нажать /start.\n\n"
+            "Владелец получит полный доступ к панели."
         )
 
 
@@ -1373,7 +1392,7 @@ async def team_identifier_message(
         return
     data = await state.get_data()
     target_role = str(data.get("admin_target_role", ""))
-    if target_role == "supervisor" and actor_role != "owner":
+    if target_role in {"owner", "supervisor"} and actor_role != "owner":
         await state.clear()
         await message.answer("Недостаточно прав.")
         return
@@ -1386,7 +1405,11 @@ async def team_identifier_message(
     target_id = int(user["user_id"])
     existing_role = role_of(target_id)
     if existing_role == "owner":
-        await message.answer("Нельзя изменить роль Владельца.")
+        if target_role == "owner":
+            await state.clear()
+            await message.answer("У этого пользователя уже полный доступ Владельца.")
+        else:
+            await message.answer("Нельзя понизить роль Владельца.")
         return
     if actor_role == "supervisor" and existing_role == "supervisor":
         await message.answer("Управляющий не может изменять других Управляющих.")

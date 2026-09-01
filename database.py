@@ -899,7 +899,7 @@ class Database:
     def set_staff_role(
         self, user_id: int, role: str, added_by: int
     ) -> dict[str, object]:
-        if role not in {"supervisor", "manager"}:
+        if role not in {"owner", "supervisor", "manager"}:
             raise ValueError("Unsupported staff role")
         with self._connect() as connection:
             profile = connection.execute(
