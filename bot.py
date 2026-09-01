@@ -808,34 +808,23 @@ def bank_links_keyboard(
     total_minor: int,
     language: str,
 ) -> InlineKeyboardMarkup:
+    """Offer a bank in-chat first, then send its QR and app link.
+
+    URL buttons open the banking app immediately, so Telegram never delivers a
+    callback to the bot and the QR screen is skipped.  The callback below is
+    handled by ``bank_select_callback``; that handler sends the QR and shows
+    the bank-app link in the next message.
+    """
     rows: list[list[InlineKeyboardButton]] = []
     current: list[InlineKeyboardButton] = []
     for method in settings.payment_methods:
         if not database.is_payment_method_enabled(method.key):
             continue
-        smart_url = smart_bank_url(method)
-        try:
-            payment_url = (
-                render_payment_template(method.url, data, total_minor)
-                if method.url
-                else None
-            )
-        except (KeyError, ValueError):
-            logging.exception("Invalid payment URL template for %s", method.key)
-            payment_url = None
-        button_url = (
-            smart_url
-            or method.android_url
-            or method.ios_url
-            or payment_url
-        )
-        if not button_url:
-            continue
         current.append(
             InlineKeyboardButton(
                 text=uniform_button_text(method.name),
                 style="success",
-                url=button_url,
+                callback_data=f"bank:select:{method.key}",
             )
         )
         if len(current) == 2:
