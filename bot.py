@@ -1305,9 +1305,9 @@ async def ask_for_account_id(
                 FSInputFile(DEPOSIT_ID_INSTRUCTION_IMAGE),
                 caption=translate(
                     language,
-                    f"💰 Пополнение счета\n\nСчет: <b>{html.escape(platform)}</b>\n\nВведите ID счета:",
-                    f"💰 Account top-up\n\nAccount: <b>{html.escape(platform)}</b>\n\nEnter account ID:",
-                    f"💰 Эсепти толуктоо\n\nЭсеп: <b>{html.escape(platform)}</b>\n\nЭсеп ID киргизиңиз:",
+                    f"Выбранная платформа: <b>{html.escape(platform)}</b>",
+                    f"Selected platform: <b>{html.escape(platform)}</b>",
+                    f"Тандалган платформа: <b>{html.escape(platform)}</b>",
                 ),
                 reply_markup=ReplyKeyboardRemove(),
             )
@@ -1316,9 +1316,9 @@ async def ask_for_account_id(
     if saved:
         text = translate(
             language,
-            f"Выбранная платформа: <b>{html.escape(platform)}</b>\nИспользовать сохранённый игровой ID или ввести другой?",
-            f"Selected platform: <b>{html.escape(platform)}</b>\nUse the saved gaming ID or enter another one.",
-            f"Тандалган платформа: <b>{html.escape(platform)}</b>\nСакталган оюн ID-син колдоносузбу же башкасын киргизесизби?",
+            "Использовать сохранённый игровой ID или ввести другой?",
+            "Use the saved gaming ID or enter another one.",
+            "Сакталган оюн ID-син колдоносузбу же башкасын киргизесизби?",
         )
         await message.answer(
             translate(
@@ -1333,14 +1333,6 @@ async def ask_for_account_id(
             text,
             reply_markup=account_choice_keyboard(saved, language),
         )
-    else:
-        text = translate(
-            language,
-            f"Выбранная платформа: <b>{html.escape(platform)}</b>\n\nВведите ID вашего игрового аккаунта:",
-            f"Selected platform: <b>{html.escape(platform)}</b>\n\nEnter your gaming account ID:",
-            f"Тандалган платформа: <b>{html.escape(platform)}</b>\n\nОюн аккаунтуңуздун ID-син киргизиңиз:",
-        )
-        await message.answer(text, reply_markup=ReplyKeyboardRemove())
 
 
 def bookmaker_config_for_platform(platform: str):
